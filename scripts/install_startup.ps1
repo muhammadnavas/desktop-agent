@@ -14,9 +14,9 @@ if (-not (Test-Path $Pythonw)) {
     throw "pythonw.exe was not found. Create .venv and install Desktop Agent before enabling startup."
 }
 $Action = New-ScheduledTaskAction -Execute $Pythonw -Argument "-m desktop_agent.startup" -WorkingDirectory $ProjectRoot
-$Trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+$Trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
 $Settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew
-$Principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
+$Principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
 Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Settings $Settings -Principal $Principal -Description "Starts the local Desktop Agent and Alexa wake-word listener at user logon." -Force | Out-Null
 Start-ScheduledTask -TaskName $TaskName
 Write-Host "Desktop Agent startup task installed and started."
