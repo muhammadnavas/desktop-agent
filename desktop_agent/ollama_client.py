@@ -168,7 +168,7 @@ def validate_tool_intent(result: object, tools: list[dict]) -> dict:
         title = arguments.get("window_title")
         if not isinstance(title, str) or not title.strip() or len(title) > 200:
             raise OllamaError("Window title must be non-empty text of at most 200 characters.")
-    elif tool_name in {"read_file", "prepare_file_write", "create_folder", "list_project_files", "search_project"}:
+    elif tool_name in {"read_file", "prepare_file_write", "create_folder"}:
         path = arguments.get("path")
         if not isinstance(path, str) or not path.strip() or len(path) > 1000:
             raise OllamaError("File path must be non-empty path text.")
@@ -176,10 +176,10 @@ def validate_tool_intent(result: object, tools: list[dict]) -> dict:
             content = arguments.get("content")
             if not isinstance(content, str) or len(content.encode("utf-8")) > 1_000_000:
                 raise OllamaError("File content must be text no larger than 1 MB.")
-        if tool_name in {"list_project_files", "search_project"}:
-            root = arguments.get("root")
-            if not isinstance(root, str) or not root.strip() or len(root) > 1000:
-                raise OllamaError("Project root must be non-empty path text.")
+    elif tool_name in {"list_project_files", "search_project"}:
+        root = arguments.get("root")
+        if not isinstance(root, str) or not root.strip() or len(root) > 1000:
+            raise OllamaError("Project root must be non-empty path text.")
         if tool_name == "search_project":
             query = arguments.get("query")
             if not isinstance(query, str) or not query.strip() or len(query) > 200:
