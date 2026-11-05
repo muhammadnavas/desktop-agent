@@ -37,9 +37,10 @@ def resolve_file_path(path: str) -> Path:
     if not expanded.is_absolute() and not expanded.drive:
         expanded = workspace_root() / expanded
     resolved = expanded.resolve()
-    sensitive_names = {".env", ".env.local", ".env.production", "id_rsa", "id_ed25519"}
+    sensitive_names = {".ssh", ".aws", ".azure", ".gnupg", "id_rsa", "id_ed25519"}
     if any(
         part.casefold() in sensitive_names
+        or part.casefold().startswith(".env")
         or "credential" in part.casefold()
         or "secret" in part.casefold()
         or part.casefold().endswith((".pem", ".key"))
@@ -218,7 +219,7 @@ def list_directory(path: str, limit: int = 100) -> dict[str, Any]:
     truncated = False
     for child in sorted(target.iterdir(), key=lambda item: (not item.is_dir(), item.name.casefold())):
         name = child.name.casefold()
-        if name in sensitive_names or "credential" in name or "secret" in name or name.endswith((".pem", ".key")):
+        if name in sensitive_names or name.startswith(".env") or "credential" in name or "secret" in name or name.endswith((".pem", ".key")):
             continue
         try:
             is_dir = child.is_dir()
