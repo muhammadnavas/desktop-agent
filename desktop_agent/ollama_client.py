@@ -91,15 +91,32 @@ def understand_command(text: str) -> dict:
     except (KeyError, TypeError, json.JSONDecodeError) as exc:
         raise OllamaError("Ollama returned an invalid intent response.") from exc
 
+    return validate_command_intent(result, apps)
+
+
+def validate_command_intent(result: object, apps: list[dict[str, str]]) -> dict:
+    """Validate model output against the small command schema and app allowlist."""
+    if not isinstance(result, dict):
+        raise OllamaError("Ollama intent must be a JSON object.")
+
     action = result.get("action")
     app_id = result.get("app_id")
+    response = result.get("response", "")
+    if action not in {"launch_app", "unsupported"}:
+        raise OllamaError("Ollama returned an unsupported intent action.")
+    if not isinstance(response, str):
+        raise OllamaError("Ollama intent response must be text.")
+
     allowed_ids = {app["id"] for app in apps}
-    if action == "launch_app" and app_id in allowed_ids:
-        return {"action": action, "app_id": app_id, "response": str(result.get("response", ""))[:240]}
+    if action == "launch_app":
+        if not isinstance(app_id, str) or app_id not in allowed_ids:
+            raise OllamaError("Ollama requested an application outside the approved allowlist.")
+        return {"action": "launch_app", "app_id": app_id, "response": response[:240]}
+
     return {
         "action": "unsupported",
         "app_id": None,
-        "response": str(result.get("response", "I can currently launch the supported desktop applications."))[:240],
+        "response": response[:240] or "I can currently launch the supported desktop applications.",
     }
 
 
