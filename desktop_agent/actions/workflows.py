@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+from difflib import SequenceMatcher
 import shutil
 import subprocess
 from pathlib import Path
@@ -13,22 +14,58 @@ DEFAULT_PROJECT_ROOT = Path(r"D:\Projects\Python\ai-browser-automation-agent")
 
 
 def is_code_autometa_command(text: str) -> bool:
-    """Recognize Code Autometa despite wake words, filler, and STT variants.
-
-    Only a transcript ending in the known workflow phrase is accepted.
-    The transcript is never interpolated into a shell command or path.
-    """
+    """Recognize the user's Code Autometa trigger despite noisy speech-to-text."""
     normalized = re.sub(r"[^a-z0-9 ]+", " ", str(text).lower())
-    normalized = " ".join(normalized.split())
-    normalized = re.sub(r"\b(?:automata|automate|auto meta|auto metta)\b", "autometa", normalized)
+    words = normalized.split()
+    if not words:
+        return False
 
-    # Whisper can prepend wake words and conversational fragments such as
-    # "like this, like so". Match the known command at the end, allowing a
-    # short preamble, but do not accept additional instructions after it.
-    return bool(
-        re.search(r"(?:^|\b)code autometa(?: project)?$", normalized)
-        or re.search(r"(?:^|\b)(?:start|open|launch|run) autometa$", normalized)
-        or re.search(r"(?:^|\b)(?:start|open|launch|run) code autometa(?: project)?$", normalized)
+    # A wake-word detection can occasionally produce only "Alexa". That is
+    # not a command and must not be sent to Ollama as one.
+    words = [word for word in words if word not in {"alexa", "hey"}]
+    if not words:
+        return False
+
+    aliases = {
+        "automata": "autometa",
+        "automate": "autometa",
+        "automaker": "autometa",
+        "auto": "autometa",
+        "meta": "autometa",
+        "metta": "autometa",
+    }
+    words = [aliases.get(word, word) for word in words]
+
+    # Strip conversational filler and command verbs wherever they precede
+    # the trigger. Keep only a short tail so unrelated speech is not treated
+    # as permission to launch a workflow.
+    fillers = {
+        "it", "is", "a", "this", "that", "like", "so", "just", "please",
+        "can", "could", "you", "well", "now", "okay", "ok", "the",
+        "start", "open", "launch", "run", "do", "for", "me",
+    }
+    meaningful = [word for word in words if word not in fillers]
+    if not meaningful:
+        return False
+
+    tail = meaningful[-4:]
+    phrase = " ".join(tail)
+    if phrase in {"code autometa", "autometa", "code autometa project"}:
+        return True
+
+    # Fuzzy matching is limited to the final one-to-three words and requires
+    # a high similarity to the known trigger. This helps with transcripts
+    # such as "good potter meta" without treating arbitrary speech as a command.
+    candidates = [
+        " ".join(tail[-size:])
+        for size in (1, 2, 3)
+        if len(tail) >= size
+    ]
+    targets = ("code autometa", "autometa")
+    return any(
+        SequenceMatcher(None, candidate.replace(" ", ""), target.replace(" ", "")).ratio() >= 0.76
+        for candidate in candidates
+        for target in targets
     )
 
 
