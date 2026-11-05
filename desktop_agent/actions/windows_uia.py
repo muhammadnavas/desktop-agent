@@ -131,3 +131,16 @@ def click_button(window_title: str, button_name: str) -> dict[str, Any]:
         "button_name": button_name.strip(),
         "action": "click",
     }
+
+
+def inspect_button_target(window_title: str, button_name: str) -> dict[str, Any]:
+    """Resolve a unique button and return a confirmation preview without clicking."""
+    window, button = _find_button(window_title, button_name)
+    return {
+        "available": True,
+        "window_title": window.window_text(),
+        "button_name": str(button.element_info.name).strip(),
+        "control_type": "Button",
+        "enabled": True,
+        "action": "click",
+    }
