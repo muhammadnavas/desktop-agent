@@ -55,7 +55,8 @@ def execute_command(request: CommandRequest):
             interpreted = understand_command(request.text)
             source = "ollama"
             response_text = interpreted["response"]
-            if interpreted["action"] == "launch_app":
+            allowed_app_ids = {item["id"] for item in supported_apps()}
+            if interpreted.get("action") == "launch_app" and interpreted.get("app_id") in allowed_app_ids:
                 intent = LaunchIntent(app_id=interpreted["app_id"])
             else:
                 return {
