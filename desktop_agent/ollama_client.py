@@ -63,6 +63,8 @@ def ollama_status() -> dict:
 
 
 def understand_command(text: str) -> dict:
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("Command text must be a non-empty string.")
     apps = supported_apps()
     system_prompt = (
         "You are the intent parser for a Windows desktop assistant. "
@@ -99,6 +101,12 @@ def validate_command_intent(result: object, apps: list[dict[str, str]]) -> dict:
     if not isinstance(result, dict):
         raise OllamaError("Ollama intent must be a JSON object.")
 
+    unexpected = set(result) - {"action", "app_id", "response"}
+    if unexpected:
+        raise OllamaError(
+            "Ollama returned unexpected intent fields: " + ", ".join(sorted(unexpected))
+        )
+
     action = result.get("action")
     app_id = result.get("app_id")
     response = result.get("response", "")
@@ -112,6 +120,9 @@ def validate_command_intent(result: object, apps: list[dict[str, str]]) -> dict:
         if not isinstance(app_id, str) or app_id not in allowed_ids:
             raise OllamaError("Ollama requested an application outside the approved allowlist.")
         return {"action": "launch_app", "app_id": app_id, "response": response[:240]}
+
+    if app_id not in (None, ""):
+        raise OllamaError("Unsupported intents must not include an application id.")
 
     return {
         "action": "unsupported",
