@@ -1,13 +1,16 @@
 """Local API for the Desktop Agent."""
 
 from pathlib import Path
+import secrets
+import time
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from desktop_agent.actions.apps import launch_app, supported_apps
-from desktop_agent.ollama_client import OllamaError, ollama_status, understand_command
+from desktop_agent.actions.desktop import capture_screenshot, execute_steps, validate_steps
+from desktop_agent.ollama_client import OllamaError, ollama_status, plan_desktop_task, understand_command
 from desktop_agent.parser import LaunchIntent, parse_command
 from desktop_agent.voice import transcribe_audio
 
@@ -17,6 +20,7 @@ app = FastAPI(
     description="Local-first Windows desktop assistant with Ollama and offline voice input.",
 )
 INDEX_FILE = Path(__file__).parent / "web" / "index.html"
+_PENDING_TASKS: dict[str, dict] = {}
 
 
 class CommandRequest(BaseModel):
@@ -115,3 +119,82 @@ async def voice_transcribe(audio: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     finally:
         await audio.close()
+
+
+class TaskPlanRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+
+
+class TaskConfirmRequest(BaseModel):
+    confirmation_token: str = Field(min_length=32, max_length=128)
+
+
+@app.get("/api/desktop/screenshot")
+def desktop_screenshot():
+    try:
+        return capture_screenshot()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post("/api/tasks/plan")
+def create_task_plan(request: TaskPlanRequest):
+    try:
+        screen = capture_screenshot()
+        # The vision model receives the actual screenshot, not guessed UI state.
+        raw_plan = plan_desktop_task(
+            request.text,
+            screen["width"],
+            screen["height"],
+            screen["image"].split(",", 1)[1],
+        )
+        steps = validate_steps(raw_plan.get("steps"))
+        if not steps:
+            raise HTTPException(
+                status_code=422,
+                detail=raw_plan.get("summary") or "The vision model could not create a safe actionable plan.",
+            )
+        token = secrets.token_urlsafe(32)
+        _PENDING_TASKS[token] = {
+            "steps": steps,
+            "width": screen["width"],
+            "height": screen["height"],
+            "created_at": time.monotonic(),
+            "summary": raw_plan["summary"],
+        }
+        # Expire stale approvals to prevent delayed execution.
+        now = time.monotonic()
+        for key in list(_PENDING_TASKS):
+            if now - _PENDING_TASKS[key]["created_at"] > 120:
+                _PENDING_TASKS.pop(key, None)
+        return {
+            "summary": raw_plan["summary"],
+            "steps": steps,
+            "confirmation_token": token,
+            "expires_in_seconds": 120,
+            "requires_confirmation": True,
+        }
+    except OllamaError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/tasks/confirm")
+def confirm_task(request: TaskConfirmRequest):
+    pending = _PENDING_TASKS.pop(request.confirmation_token, None)
+    if not pending:
+        raise HTTPException(status_code=404, detail="This approval is invalid, expired, or already used. Create a new plan.")
+    if time.monotonic() - pending["created_at"] > 120:
+        raise HTTPException(status_code=410, detail="This approval expired. Create a new plan.")
+    try:
+        results = execute_steps(pending["steps"], pending["width"], pending["height"])
+        screenshot = capture_screenshot()
+        return {
+            "success": True,
+            "summary": pending["summary"],
+            "steps": results,
+            "screenshot": screenshot,
+        }
+    except (RuntimeError, ValueError, OSError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
