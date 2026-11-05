@@ -58,3 +58,9 @@ def test_folder_parser_extracts_name_and_destination():
     intent = parse_create_folder_command("create a folder called Projects in Documents")
     assert intent.folder_name == "projects"
     assert intent.destination == "documents"
+
+
+def test_folder_parser_accepts_absolute_windows_destination():
+    intent = parse_create_folder_command(r"create folder called Reports at C:\\Users\\Navas\\Desktop")
+    assert intent.folder_name == "reports"
+    assert intent.destination == r"c:\\users\\navas\\desktop"
