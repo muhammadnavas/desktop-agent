@@ -113,7 +113,7 @@ def _list_open_windows() -> dict[str, Any]:
 registry.register(
     ToolDefinition(
         name="read_file",
-        description="Read a UTF-8 text file from the configured workspace using a relative path; maximum 1 MB.",
+        description="Read a UTF-8 text file from any accessible local path; maximum 1 MB.",
         handler=_read_file,
         required_arguments=("path",),
     )
@@ -121,7 +121,7 @@ registry.register(
 registry.register(
     ToolDefinition(
         name="prepare_file_write",
-        description="Stage creation or editing of a UTF-8 text file inside the configured workspace; returns a preview and one-time approval token and does not write until confirmed.",
+        description="Stage creation or editing of a UTF-8 text file anywhere on the local filesystem; returns a preview and one-time approval token and does not write until confirmed.",
         handler=_prepare_file_write,
         required_arguments=("path", "content"),
     )
@@ -129,7 +129,7 @@ registry.register(
 registry.register(
     ToolDefinition(
         name="create_folder",
-        description="Create a new folder inside the configured workspace using a relative path.",
+        description="Create a new folder at any accessible local filesystem path.",
         handler=_create_folder,
         required_arguments=("path",),
     )
