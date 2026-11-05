@@ -143,3 +143,64 @@ def create_folder(path: str) -> dict[str, Any]:
     target.mkdir(parents=True, exist_ok=False)
     return {"success": True, "created": True, "already_exists": False,
             "path": str(target)}
+
+
+PROJECT_TEXT_EXTENSIONS = {".py", ".js", ".jsx", ".ts", ".tsx", ".html", ".css", ".json", ".yaml", ".yml", ".toml", ".md", ".txt", ".sql", ".java", ".go", ".rs", ".cs"}
+PROJECT_IGNORED_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", ".next", "dist", "build"}
+
+
+def _project_root(root: str) -> Path:
+    target = resolve_file_path(root)
+    if not target.exists() or not target.is_dir():
+        raise FileNotFoundError(f"Project directory not found: {target}")
+    return target
+
+
+def list_project_files(root: str, limit: int = 100) -> dict[str, Any]:
+    """List source/configuration files while skipping generated directories."""
+    import os
+    base = _project_root(root)
+    if not isinstance(limit, int) or not 1 <= limit <= 120:
+        raise ValueError("limit must be between 1 and 120.")
+    found = []
+    for current, dirs, names in os.walk(base):
+        dirs[:] = sorted(d for d in dirs if d.casefold() not in PROJECT_IGNORED_DIRS)
+        for name in sorted(names):
+            path = Path(current) / name
+            if path.suffix.casefold() in PROJECT_TEXT_EXTENSIONS:
+                found.append(path.relative_to(base).as_posix())
+                if len(found) >= limit:
+                    return {"success": True, "root": str(base), "files": found, "count": len(found), "truncated": True}
+    return {"success": True, "root": str(base), "files": found, "count": len(found), "truncated": False}
+
+
+def search_project(root: str, query: str, limit: int = 30) -> dict[str, Any]:
+    """Search literal text in bounded UTF-8 source files."""
+    import os
+    base = _project_root(root)
+    if not isinstance(query, str) or not query.strip() or len(query) > 200:
+        raise ValueError("query must contain 1–200 characters.")
+    if not isinstance(limit, int) or not 1 <= limit <= 100:
+        raise ValueError("limit must be between 1 and 100.")
+    matches = []
+    inspected = 0
+    for current, dirs, names in os.walk(base):
+        dirs[:] = sorted(d for d in dirs if d.casefold() not in PROJECT_IGNORED_DIRS)
+        for name in sorted(names):
+            path = Path(current) / name
+            if path.suffix.casefold() not in PROJECT_TEXT_EXTENSIONS:
+                continue
+            try:
+                resolved = resolve_file_path(str(path))
+                if resolved.stat().st_size > 80000:
+                    continue
+                content = resolved.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError, ValueError):
+                continue
+            inspected += 1
+            for number, line in enumerate(content.splitlines(), 1):
+                if query.casefold() in line.casefold():
+                    matches.append({"file": resolved.relative_to(base).as_posix(), "line": number, "text": line[:500]})
+                    if len(matches) >= limit:
+                        return {"success": True, "root": str(base), "query": query, "files_inspected": inspected, "matches": matches, "truncated": True}
+    return {"success": True, "root": str(base), "query": query, "files_inspected": inspected, "matches": matches, "truncated": False}
