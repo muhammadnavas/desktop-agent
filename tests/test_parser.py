@@ -32,3 +32,8 @@ def test_requires_launch_verb():
 
 def test_empty_input():
     assert parse_command("   ") is None
+
+
+def test_close_whatsapp_is_not_a_launch_command():
+    assert parse_command("Alexa close WhatsApp") is None
+    assert parse_command("close WhatsApp") is None
