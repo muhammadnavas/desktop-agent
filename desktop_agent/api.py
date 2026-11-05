@@ -353,6 +353,8 @@ def execute_command(request: CommandRequest):
             "close_current_tab": f"Closed the current tab in {result.get('window', 'your browser')}.",
             "get_system_status": f"System status collected for {result.get('system', 'this computer')}.",
             "read_file": f"Read {result.get('path', 'the requested file')}.",
+            "list_project_files": f"Found {result.get('count', 0)} project files.",
+            "search_project": f"Found {len(result.get('matches', []))} matches in {result.get('files_inspected', 0)} files.",
             "prepare_file_write": (
                 f"Prepared {result.get('path', 'the requested file')} for review. "
                 f"{'This will overwrite the existing file. ' if result.get('overwrites_existing') else ''}"
