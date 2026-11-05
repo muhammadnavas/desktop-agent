@@ -142,3 +142,8 @@ pytest -q
 1. Session memory, audit logs, retries and recovery
 2. Better task verification and interruption handling
 3. Wake-word and push-to-talk support
+
+
+### Windows UI Automation inspection
+
+Install the optional desktop dependencies with `pip install -e ".[desktop]"`. The registered `get_window_controls` tool inspects a visible window by a case-insensitive title substring and returns accessible control names, types, automation IDs, visibility, and enabled state. It deliberately does not read edit-field values or perform actions. Inspection is read-only and Windows-only; actual interaction remains behind the existing screenshot-plan and explicit-confirmation flow.
