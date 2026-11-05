@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Desktop Agent</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,sans-serif}*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:#090d16;color:#e8edf7;display:grid;place-items:center;padding:24px}
+main{width:min(760px,100%);border:1px solid #263247;background:#101827;border-radius:20px;padding:28px;box-shadow:0 24px 80px #0007}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:28px}.brand{display:flex;align-items:center;gap:12px}
+.logo{width:44px;height:44px;display:grid;place-items:center;border-radius:13px;background:#243b64;color:#9fc3ff;font-weight:800;font-size:20px}
+h1{font-size:22px;margin:0}.muted{color:#94a3b8;font-size:13px;margin-top:4px}
+.pill{font-size:12px;border:1px solid #34445e;padding:7px 10px;border-radius:99px;color:#b8c4d8}.pill.ok{border-color:#27634d;color:#9de0bf}
+label{display:block;font-size:13px;color:#b8c4d8;margin-bottom:9px}.entry{display:flex;gap:10px}
+input{flex:1;min-width:0;padding:15px 14px;border:1px solid #34445e;border-radius:11px;background:#0b1220;color:white;font-size:15px;outline:none}
+input:focus{border-color:#6b9eea}button{border:0;border-radius:11px;padding:0 18px;color:#07111f;background:#9fc3ff;font-weight:700;cursor:pointer}
+button:disabled{opacity:.55;cursor:wait}.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+.secondary{background:#1c2a40;color:#c9d8ee;border:1px solid #34445e;padding:10px 13px}.mic{background:#263b5b;color:#dceaff;padding:10px 14px}
+.mic.recording{background:#783d4a;color:#fff}.examples{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}
+.chip{padding:8px 11px;border:1px solid #34445e;border-radius:999px;color:#c3d1e7;background:transparent;font-size:12px}
+.status{border:1px solid #263247;border-radius:12px;padding:14px;color:#b7c5d9;font-size:13px;min-height:48px;line-height:1.5}
+.status.ok{border-color:#27634d;color:#9de0bf}.status.error{border-color:#75414a;color:#ffb4bd}
+.meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:13px;color:#718096;font-size:12px}
+hr{border:0;border-top:1px solid #263247;margin:22px 0}.foot{color:#718096;font-size:12px;line-height:1.6;margin-top:18px}
+@media(max-width:540px){main{padding:20px}.entry{flex-direction:column}button{min-height:44px}.entry button{width:100%}}
+</style>
+</head>
+<body><main>
+<header><div class="brand"><div class="logo">D</div><div><h1>Desktop Agent</h1><div class="muted">Local AI · Voice · Windows control</div></div></div><div id="ollama-pill" class="pill">Checking Ollama…</div></header>
+<form id="command-form"><label for="command">Tell your computer what to do</label><div class="entry"><input id="command" maxlength="1000" autocomplete="off" placeholder="Open Notepad and start writing…" required><button id="run" type="submit">Run command</button></div></form>
+<div class="actions"><button id="record" class="mic" type="button">Start voice input</button><button id="refresh" class="secondary" type="button">Refresh Ollama status</button></div>
+<div class="examples"><button class="chip" type="button" data-command="Open Notepad">Open Notepad</button><button class="chip" type="button" data-command="Launch Calculator">Calculator</button><button class="chip" type="button" data-command="Open File Explorer">File Explorer</button><button class="chip" type="button" data-command="Start VS Code">VS Code</button></div>
+<div id="status" class="status" role="status" aria-live="polite">Ready. Type a command or use the microphone.</div>
+<div class="meta"><span id="engine">Intent engine: checking…</span><span>Localhost only</span></div>
+<hr>
+<div class="muted">Voice is transcribed locally with faster-whisper. Intent understanding uses your local Ollama model. If Ollama is unavailable, supported launch commands fall back to deterministic parsing.</div>
+<div class="foot">Safety: the model can only select from the approved application list. It cannot run arbitrary shell commands. Microphone access requires browser permission.</div>
+</main>
+<script>
+const form=document.querySelector("#command-form"),input=document.querySelector("#command"),statusBox=document.querySelector("#status");
+const run=document.querySelector("#run"),record=document.querySelector("#record"),pill=document.querySelector("#ollama-pill"),engine=document.querySelector("#engine");
+let mediaRecorder=null,chunks=[],recording=false;
+function show(message,kind=""){statusBox.className="status "+kind;statusBox.textContent=message}
+async function refreshStatus(){try{const r=await fetch("/api/ollama/status"),d=await r.json();if(d.connected&&d.model_available){pill.textContent="Ollama · "+d.configured_model;pill.className="pill ok";engine.textContent="Intent engine: local Ollama"}else if(d.connected){pill.textContent="Model not pulled";pill.className="pill";engine.textContent="Intent engine: rules fallback"}else{pill.textContent="Ollama offline";pill.className="pill";engine.textContent="Intent engine: rules fallback"}}catch{pill.textContent="Backend offline";engine.textContent="Intent engine: unavailable"}}
+async function sendCommand(text){show("Understanding your request…");run.disabled=true;try{const r=await fetch("/api/commands",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,use_ollama:true})});const d=await r.json();if(!r.ok)throw new Error(d.detail||"Command failed.");show(d.message+(d.source?" · "+d.source:""),d.success?"ok":"");}catch(e){show(e.message,"error")}finally{run.disabled=false}}
+form.addEventListener("submit",e=>{e.preventDefault();if(input.value.trim())sendCommand(input.value.trim())});
+document.querySelectorAll("[data-command]").forEach(b=>b.addEventListener("click",()=>{input.value=b.dataset.command;sendCommand(input.value)}));
+document.querySelector("#refresh").addEventListener("click",refreshStatus);
+async function startRecording(){if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){show("This browser does not support microphone recording. Try a recent version of Chrome or Edge.","error");return}
+try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});chunks=[];mediaRecorder=new MediaRecorder(stream);mediaRecorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+mediaRecorder.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());record.classList.remove("recording");record.textContent="Start voice input";recording=false;show("Transcribing locally…");const blob=new Blob(chunks,{type:mediaRecorder.mimeType||"audio/webm"});const body=new FormData();body.append("audio",blob,"recording.webm");try{const r=await fetch("/api/voice/transcribe",{method:"POST",body});const d=await r.json();if(!r.ok)throw new Error(d.detail||"Transcription failed.");input.value=d.text;show("Heard: "+d.text);sendCommand(d.text)}catch(e){show(e.message,"error")}};
+mediaRecorder.start();recording=true;record.classList.add("recording");record.textContent="Stop recording";show("Listening… Select Stop recording when you're done.");}
+catch(e){show("Microphone access failed: "+e.message,"error")}}
+record.addEventListener("click",()=>{if(recording)mediaRecorder.stop();else startRecording()});
+refreshStatus();
+</script></body></html>
