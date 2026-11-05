@@ -140,6 +140,11 @@ def _get_system_status() -> dict[str, Any]:
     return get_system_status()
 
 
+def _run_diagnostic_command(command_id: str) -> dict[str, Any]:
+    from desktop_agent.actions.diagnostics import run_diagnostic_command
+    return run_diagnostic_command(command_id)
+
+
 registry.register(
     ToolDefinition(
         name="read_file",
@@ -266,5 +271,15 @@ registry.register(
         description="List files and subfolders in a directory with sensitive credential files filtered out.",
         handler=_list_directory,
         required_arguments=("path",),
+    )
+)
+
+
+registry.register(
+    ToolDefinition(
+        name="run_diagnostic_command",
+        description="Run a fixed read-only diagnostic such as ipconfig, tasklist, whoami, systeminfo, or a tool version check. Arbitrary commands and arguments are not accepted.",
+        handler=_run_diagnostic_command,
+        required_arguments=("command_id",),
     )
 )
