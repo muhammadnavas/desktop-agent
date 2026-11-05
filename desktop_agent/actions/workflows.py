@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -12,8 +13,17 @@ DEFAULT_PROJECT_ROOT = Path(r"D:\Projects\Python\ai-browser-automation-agent")
 
 
 def is_code_autometa_command(text: str) -> bool:
-    """Recognize the explicit voice phrase without sending it to Ollama."""
-    normalized = " ".join(text.lower().strip().split())
+    """Recognize the Code Autometa wake command, including common STT variants.
+
+    Speech recognition often includes the wake word ("Alexa") and may hear
+    "Autometa" as "Automata". Normalize those harmless variations before
+    matching; never use the transcript as a shell command or filesystem path.
+    """
+    normalized = re.sub(r"[^a-z0-9 ]+", " ", str(text).lower())
+    normalized = " ".join(normalized.split())
+    normalized = re.sub(r"^(?:hey )?alexa\\s+", "", normalized)
+    normalized = re.sub(r"\\bautomata\\b", "autometa", normalized)
+
     return normalized in {
         "code autometa",
         "code autometa project",
