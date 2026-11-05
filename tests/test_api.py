@@ -362,13 +362,15 @@ def test_create_folder_tool_creates_only_inside_workspace(monkeypatch, tmp_path)
     assert (tmp_path / "new-project" / "docs").is_dir()
 
 
-def test_create_folder_rejects_parent_traversal(monkeypatch, tmp_path):
+def test_create_folder_allows_parent_traversal(monkeypatch, tmp_path):
     from desktop_agent.actions.files import create_folder
 
-    monkeypatch.setenv("DESKTOP_AGENT_WORKSPACE", str(tmp_path))
-    import pytest
-    with pytest.raises(ValueError):
-        create_folder("../outside")
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.setenv("DESKTOP_AGENT_WORKSPACE", str(workspace))
+    result = create_folder("../outside")
+    assert result["created"] is True
+    assert (tmp_path / "outside").is_dir()
 
 
 def test_create_folder_asks_for_destination_and_uses_follow_up(monkeypatch, tmp_path):
@@ -405,13 +407,21 @@ def test_model_clarification_is_returned_without_running_tool(monkeypatch):
     assert response.json()["needs_clarification"] is True
     assert executed == []
 
-def test_close_phrase_routes_to_close_tool_without_ollama(monkeypatch):
+def test_close_phrase_requires_approval_before_execution(monkeypatch):
     executed = []
     monkeypatch.setattr(api, "understand_command", lambda _text: (_ for _ in ()).throw(AssertionError("Ollama must not override close")))
     monkeypatch.setattr(api, "execute_tool", lambda name, args: executed.append((name, args)) or {"app": "WhatsApp"})
     response = client.post("/api/commands", json={"text": "Let's close WhatsApp"})
     assert response.status_code == 200
-    assert response.json()["tool"] == "close_app"
+    payload = response.json()
+    assert payload["needs_approval"] is True
+    assert payload["tool"] == "close_app"
+    assert executed == []
+
+    confirmed = client.post("/api/commands/confirm", json={
+        "confirmation_token": payload["confirmation_token"]
+    })
+    assert confirmed.status_code == 200
     assert executed == [("close_app", {"app_id": "whatsapp"})]
 
 
@@ -479,3 +489,25 @@ def test_file_tools_allow_parent_traversal_for_relative_paths(monkeypatch, tmp_p
     result = create_folder("../outside-folder")
     assert result["created"] is True
     assert (tmp_path / "outside-folder").is_dir()
+
+
+def test_blocked_destructive_command_never_reaches_ollama_or_tools(monkeypatch):
+    executed = []
+    monkeypatch.setattr(api, "understand_command", lambda _text: (_ for _ in ()).throw(AssertionError("must not call Ollama")))
+    monkeypatch.setattr(api, "execute_tool", lambda *args: executed.append(args))
+    response = client.post("/api/commands", json={"text": "delete all files in Downloads"})
+    assert response.status_code == 200
+    assert response.json()["blocked"] is True
+    assert executed == []
+
+
+def test_safe_folder_creation_executes_without_approval(monkeypatch, tmp_path):
+    monkeypatch.setenv("DESKTOP_AGENT_WORKSPACE", str(tmp_path))
+    response = client.post("/api/commands", json={
+        "text": "create folder called Projects in Documents",
+        "use_ollama": False,
+    })
+    assert response.status_code == 200
+    assert response.json()["tool"] == "create_folder"
+    assert "needs_approval" not in response.json()
+    assert (tmp_path / "documents" / "projects").is_dir()
