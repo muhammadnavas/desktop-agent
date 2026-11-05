@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from desktop_agent.actions.apps import supported_apps
+from desktop_agent.permissions import classify_command_text, classify_tool
 from desktop_agent.actions.registry import available_tools, execute_tool
 from desktop_agent.actions.desktop import capture_screenshot, execute_steps, validate_steps
 from desktop_agent.actions.workflows import is_code_autometa_command, start_code_autometa_workflow
@@ -80,6 +81,7 @@ app = FastAPI(
 INDEX_FILE = Path(__file__).parent / "web" / "index.html"
 _PENDING_TASKS: dict[str, dict] = {}
 _PENDING_UI_ACTIONS: dict[str, dict] = {}
+_PENDING_COMMAND_APPROVALS: dict[str, dict] = {}
 _BLOCKED_TASK_TERMS = ("password", "passcode", "one-time code", "otp", "payment", "purchase", "checkout", "send money", "transfer money", "bank transfer", "delete", "erase", "format drive", "bank account", "credit card", "security settings", "change password")
 
 
@@ -204,6 +206,10 @@ def get_diagnostics():
 @app.post("/api/commands")
 def execute_command(request: CommandRequest):
     logger.info("COMMAND RECEIVED | text=%r | ollama=%s | session=%s", request.text, request.use_ollama, request.session_id)
+    command_permission = classify_command_text(request.text)
+    if command_permission.level == "blocked":
+        logger.warning("COMMAND BLOCKED | text=%r | reason=%s", request.text, command_permission.reason)
+        return {"success": False, "blocked": True, "message": command_permission.reason, "source": "permission_policy"}
     previous = _PENDING_CLARIFICATIONS.pop(request.session_id, None)
     if previous:
         prior_folder = parse_create_folder_command(previous)
@@ -314,8 +320,35 @@ def execute_command(request: CommandRequest):
             detail="I couldn't identify a supported action. Try opening an app or asking which window is active/open.",
         )
 
+    permission = classify_tool(tool_name)
+    if permission.level == "blocked":
+        logger.warning("ACTION BLOCKED | tool=%s | reason=%s", tool_name, permission.reason)
+        return {"success": False, "blocked": True, "message": permission.reason,
+                "source": "permission_policy", "tool": tool_name}
+    if permission.level == "approval" and tool_name != "prepare_file_write":
+        now = time.monotonic()
+        for key in list(_PENDING_COMMAND_APPROVALS):
+            if now - _PENDING_COMMAND_APPROVALS[key]["created_at"] > 90:
+                _PENDING_COMMAND_APPROVALS.pop(key, None)
+        token = secrets.token_urlsafe(32)
+        _PENDING_COMMAND_APPROVALS[token] = {
+            "tool": tool_name,
+            "arguments": dict(tool_arguments),
+            "created_at": now,
+        }
+        logger.info("ACTION AWAITING APPROVAL | tool=%s | arguments=%s", tool_name, tool_arguments)
+        return {
+            "success": True,
+            "needs_approval": True,
+            "confirmation_token": token,
+            "expires_in_seconds": 90,
+            "tool": tool_name,
+            "message": permission.reason + " Approve this exact action to continue.",
+            "source": source,
+        }
+
     try:
-        logger.info("ACTION START | tool=%s | arguments=%s | source=%s", tool_name, tool_arguments, source)
+        logger.info("ACTION START | tool=%s | arguments=%s | source=%s | permission=%s", tool_name, tool_arguments, source, permission.level)
         result = execute_tool(tool_name, tool_arguments)
         logger.info("ACTION SUCCESS | tool=%s | result=%s", tool_name, result)
         default_messages = {
