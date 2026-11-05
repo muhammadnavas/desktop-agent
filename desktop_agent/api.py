@@ -526,6 +526,17 @@ def confirm_ui_button_click(request: UIActionConfirmRequest):
         raise HTTPException(status_code=500, detail=f"Windows could not click the button: {exc}") from exc
 
 
+@app.post("/api/files/cancel-write")
+def cancel_file_write_endpoint(request: FileWriteConfirmRequest):
+    """Discard a staged file write without modifying the target."""
+    from desktop_agent.actions.files import cancel_file_write
+
+    try:
+        return cancel_file_write(request.confirmation_token)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @app.post("/api/files/confirm-write")
 def confirm_file_write_endpoint(request: FileWriteConfirmRequest):
     """Commit a staged file write only after explicit user confirmation."""
