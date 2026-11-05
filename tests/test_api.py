@@ -281,3 +281,37 @@ def test_ui_button_click_plan_rejects_unavailable_target(monkeypatch):
     response = client.post("/api/ui-actions/plan-click",
         json={"window_title": "Notepad", "button_name": "Save"})
     assert response.status_code == 400
+
+
+def test_file_write_confirmation_endpoint_commits_only_after_approval(monkeypatch, tmp_path):
+    from desktop_agent.actions import files as file_actions
+
+    monkeypatch.setenv("DESKTOP_AGENT_WORKSPACE", str(tmp_path))
+    staged = file_actions.prepare_file_write("docs/hello.txt", "Hello from Alexa")
+    target = tmp_path / "docs" / "hello.txt"
+    assert not target.exists()
+    response = client.post("/api/files/confirm-write",
+        json={"confirmation_token": staged["confirmation_token"]})
+    assert response.status_code == 200
+    assert target.read_text(encoding="utf-8") == "Hello from Alexa"
+    replay = client.post("/api/files/confirm-write",
+        json={"confirmation_token": staged["confirmation_token"]})
+    assert replay.status_code == 404
+
+
+def test_file_write_requires_valid_confirmation_token():
+    response = client.post("/api/files/confirm-write",
+        json={"confirmation_token": "x" * 40})
+    assert response.status_code == 404
+
+
+def test_file_tools_are_registered():
+    response = client.get("/api/tools")
+    names = {tool["name"] for tool in response.json()["tools"]}
+    assert {"read_file", "prepare_file_write"} <= names
+
+
+def test_file_management_skill_is_available():
+    response = client.get("/api/skills/file_management")
+    assert response.status_code == 200
+    assert "prepare_file_write" in response.json()["instructions"]
