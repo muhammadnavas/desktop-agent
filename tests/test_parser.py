@@ -1,4 +1,4 @@
-from nova.parser import parse_command
+from desktop_agent.parser import parse_command
 
 
 def test_notepad():
@@ -23,3 +23,7 @@ def test_rejects_arbitrary_command():
 
 def test_requires_launch_verb():
     assert parse_command("Notepad") is None
+
+
+def test_empty_input():
+    assert parse_command("   ") is None
