@@ -84,10 +84,10 @@ def _get_active_window() -> dict[str, Any]:
     return get_active_window()
 
 
-def _list_open_windows(limit: int = 30) -> dict[str, Any]:
+def _list_open_windows() -> dict[str, Any]:
     from desktop_agent.actions.windows import list_open_windows
 
-    return list_open_windows(limit)
+    return list_open_windows()
 
 
 registry.register(
@@ -108,7 +108,7 @@ registry.register(
 registry.register(
     ToolDefinition(
         name="list_open_windows",
-        description="List visible top-level Windows windows and their titles; accepts optional limit from 1 to 50.",
+        description="List up to 30 visible top-level Windows windows and their titles.",
         handler=_list_open_windows,
     )
 )
