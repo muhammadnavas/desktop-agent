@@ -11,6 +11,9 @@ from bson import ObjectId
 from pymongo import MongoClient
 from pymongo.collection import Collection
 from pymongo.errors import PyMongoError
+from dotenv import load_dotenv
+
+load_dotenv()
 
 MONGO_URI = os.getenv("DESKTOP_AGENT_MONGO_URI", "mongodb://127.0.0.1:27017")
 MONGO_DATABASE = os.getenv("DESKTOP_AGENT_MONGO_DATABASE", "desktop_agent")
