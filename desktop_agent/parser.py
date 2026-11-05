@@ -22,7 +22,7 @@ def parse_command(text: str) -> LaunchIntent | None:
     if not isinstance(text, str) or not text.strip():
         return None
     normalized = text.lower().strip()
-    if not re.search(r"\b(open|launch|start|run)\b", normalized):
+    if not re.search(r"\b(open|launch|start|run)\b", normalized) or re.search(r"\b(close|quit|exit|terminate)\b", normalized):
         return None
     for app_id, patterns in _APP_PATTERNS.items():
         if any(re.search(pattern, normalized) for pattern in patterns):
