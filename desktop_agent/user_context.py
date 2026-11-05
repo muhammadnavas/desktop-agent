@@ -34,7 +34,7 @@ USER_CONTEXT = {
 
 def format_user_context() -> str:
     """Render stable user context for the local model prompt."""
-    return "\\n".join(
+    return "\n".join(
         f"{section.replace('_', ' ').title()}: " + "; ".join(items)
         for section, items in USER_CONTEXT.items()
     )
