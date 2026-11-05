@@ -5,7 +5,11 @@ import os
 import urllib.error
 import urllib.request
 
+from dotenv import load_dotenv
+
 from desktop_agent.actions.apps import supported_apps
+
+load_dotenv()
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
