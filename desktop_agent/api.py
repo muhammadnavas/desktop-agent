@@ -94,8 +94,21 @@ def execute_command(request: CommandRequest):
 async def voice_transcribe(audio: UploadFile = File(...)):
     suffix = Path(audio.filename or "recording.webm").suffix.lower()
     try:
-        content = await audio.read()
-        transcript = transcribe_audio(content, suffix)
+        # Read in bounded chunks so a large upload is rejected before it is
+        # fully buffered in memory.
+        chunks: list[bytes] = []
+        total_bytes = 0
+        max_bytes = 20 * 1024 * 1024
+        while True:
+            chunk = await audio.read(min(1024 * 1024, max_bytes + 1 - total_bytes))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total_bytes += len(chunk)
+            if total_bytes > max_bytes:
+                raise HTTPException(status_code=413, detail="Audio file is too large (20 MB limit).")
+
+        transcript = transcribe_audio(b"".join(chunks), suffix)
         return {"success": True, "text": transcript}
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
