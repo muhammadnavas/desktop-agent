@@ -33,3 +33,9 @@ def test_registry_rejects_unexpected_arguments():
 def test_registry_rejects_non_object_arguments():
     with pytest.raises(ValueError, match="JSON object"):
         execute_tool("launch_app", ["notepad"])
+
+
+@pytest.mark.parametrize("app_id", [None, 42, [], ""])
+def test_launch_tool_rejects_invalid_app_id_type(app_id):
+    with pytest.raises(ValueError, match="non-empty string"):
+        execute_tool("launch_app", {"app_id": app_id})
