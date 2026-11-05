@@ -22,6 +22,12 @@ button:disabled{opacity:.55;cursor:wait}.actions{display:flex;gap:9px;flex-wrap:
 .status.ok{border-color:#27634d;color:#9de0bf}.status.error{border-color:#75414a;color:#ffb4bd}
 .meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:13px;color:#718096;font-size:12px}
 hr{border:0;border-top:1px solid #263247;margin:22px 0}.foot{color:#718096;font-size:12px;line-height:1.6;margin-top:18px}
+.desktop-panel{border:1px solid #34445e;border-radius:14px;padding:16px;margin-top:18px;background:#0d1523}
+.desktop-panel h2{font-size:16px;margin:0 0 8px}.desktop-panel p{font-size:12px;color:#94a3b8;line-height:1.5}
+textarea{width:100%;min-height:76px;resize:vertical;padding:12px;border:1px solid #34445e;border-radius:10px;background:#0b1220;color:#fff;font:inherit}
+.plan-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.plan-box{font-size:13px;color:#c6d5ea;white-space:pre-wrap;margin-top:12px}
+.preview{display:block;width:100%;max-height:380px;object-fit:contain;border:1px solid #34445e;border-radius:10px;margin-top:12px;background:#080d16}
+.approve{background:#83d5ad;color:#082014;padding:11px 14px}.danger-note{color:#ffbf8e!important}
 @media(max-width:540px){main{padding:20px}.entry{flex-direction:column}button{min-height:44px}.entry button{width:100%}}
 </style>
 </head>
@@ -32,6 +38,17 @@ hr{border:0;border-top:1px solid #263247;margin:22px 0}.foot{color:#718096;font-
 <div class="examples"><button class="chip" type="button" data-command="Open Notepad">Open Notepad</button><button class="chip" type="button" data-command="Launch Calculator">Calculator</button><button class="chip" type="button" data-command="Open File Explorer">File Explorer</button><button class="chip" type="button" data-command="Start VS Code">VS Code</button></div>
 <div id="status" class="status" role="status" aria-live="polite">Ready. Type a command or use the microphone.</div>
 <div class="meta"><span id="engine">Intent engine: checking…</span><span>Localhost only</span></div>
+<section class="desktop-panel">
+<h2>Desktop eyes & hands</h2>
+<p>Capture your screen, ask the local vision model to plan a task, inspect every proposed step, then explicitly approve execution. Keep sensitive windows closed. Do not ask it to enter passwords, make payments, delete data, or change security settings.</p>
+<div class="plan-actions"><button id="screenshot" class="secondary" type="button">Capture screenshot</button></div>
+<img id="screen-preview" class="preview" alt="Desktop screenshot preview" hidden>
+<label for="task" style="margin-top:14px">Describe a desktop task</label>
+<textarea id="task" maxlength="1000" placeholder="Example: Open the browser, click the address bar, and search for Python documentation."></textarea>
+<div class="plan-actions"><button id="make-plan" type="button">Create task plan</button><button id="approve-plan" class="approve" type="button" hidden>Confirm & execute</button></div>
+<div id="plan-box" class="plan-box" role="status" aria-live="polite">No task plan yet.</div>
+<p class="danger-note">Every plan requires confirmation and expires after 2 minutes. Emergency stop: move your mouse to the top-left screen corner to trigger PyAutoGUI's failsafe.</p>
+</section>
 <hr>
 <div class="muted">Voice is transcribed locally with faster-whisper. Intent understanding uses your local Ollama model. If Ollama is unavailable, supported launch commands fall back to deterministic parsing.</div>
 <div class="foot">Safety: the model can only select from the approved application list. It cannot run arbitrary shell commands. Microphone access requires browser permission.</div>
@@ -52,5 +69,12 @@ mediaRecorder.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());record.cl
 mediaRecorder.start();recording=true;record.classList.add("recording");record.textContent="Stop recording";show("Listening… Select Stop recording when you're done.");}
 catch(e){show("Microphone access failed: "+e.message,"error")}}
 record.addEventListener("click",()=>{if(recording)mediaRecorder.stop();else startRecording()});
+const screenshotButton=document.querySelector("#screenshot"),preview=document.querySelector("#screen-preview");
+const taskInput=document.querySelector("#task"),makePlan=document.querySelector("#make-plan");
+const approvePlan=document.querySelector("#approve-plan"),planBox=document.querySelector("#plan-box");
+let pendingToken=null;
+screenshotButton.addEventListener("click",async()=>{try{show("Capturing desktop…");const r=await fetch("/api/desktop/screenshot");const d=await r.json();if(!r.ok)throw new Error(d.detail||"Screenshot failed");preview.src=d.image;preview.hidden=false;show("Screenshot captured.","ok")}catch(e){show(e.message,"error")}});
+makePlan.addEventListener("click",async()=>{const text=taskInput.value.trim();if(!text){show("Describe the task first.","error");return}makePlan.disabled=true;approvePlan.hidden=true;pendingToken=null;planBox.textContent="Capturing screen and asking the local vision model to plan…";try{const r=await fetch("/api/tasks/plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});const d=await r.json();if(!r.ok)throw new Error(d.detail||"Could not create a plan");pendingToken=d.confirmation_token;planBox.textContent=d.summary+"\n\n"+d.steps.map((s,i)=>(i+1)+". "+(s.action==="click"?"Click at ("+s.x+", "+s.y+")":s.action==="type"?"Type: "+s.text:s.action==="press"?"Press: "+s.keys.join(" + "):s.action==="scroll"?"Scroll "+s.amount:"Wait "+s.seconds+"s")).join("\n")+"\n\nApproval expires in "+d.expires_in_seconds+" seconds.";approvePlan.hidden=false;show("Plan ready. Review every step before approving.","ok")}catch(e){planBox.textContent="";show(e.message,"error")}finally{makePlan.disabled=false}});
+approvePlan.addEventListener("click",async()=>{if(!pendingToken)return;const token=pendingToken;pendingToken=null;approvePlan.disabled=true;approvePlan.hidden=true;show("Executing approved steps…");try{const r=await fetch("/api/tasks/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirmation_token:token})});const d=await r.json();if(!r.ok)throw new Error(d.detail||"Task execution failed");preview.src=d.screenshot.image;preview.hidden=false;planBox.textContent=d.summary+"\n\n"+d.steps.map(s=>"Step "+s.step+": "+s.status).join("\n");show("Task completed. Review the updated screenshot.","ok")}catch(e){show(e.message,"error")}finally{approvePlan.disabled=false}});
 refreshStatus();
 </script></body></html>
