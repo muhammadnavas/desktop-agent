@@ -32,7 +32,7 @@ def _handle_wake_command(transcript: str) -> None:
     """Execute a spoken command and speak its actual outcome."""
     logger.info("VOICE COMMAND RECEIVED | transcript=%r", transcript)
     try:
-        result = execute_command(CommandRequest(text=transcript, use_ollama=True))
+        result = execute_command(CommandRequest(text=transcript, use_ollama=True, session_id="voice"))
         response = result.get("message") or "Command completed."
         logger.info("AGENT RESPONSE | success=%s source=%s tool=%s response=%s", result.get("success"), result.get("source"), result.get("tool", "workflow"), response)
     except HTTPException as exc:
@@ -85,6 +85,10 @@ _BLOCKED_TASK_TERMS = ("password", "passcode", "one-time code", "otp", "payment"
 class CommandRequest(BaseModel):
     text: str = Field(min_length=1, max_length=1000)
     use_ollama: bool = True
+    session_id: str = Field(default="default", min_length=1, max_length=80)
+
+
+_PENDING_CLARIFICATIONS: dict[str, str] = {}
 
 
 @app.get("/")
@@ -198,9 +202,11 @@ def get_diagnostics():
 
 @app.post("/api/commands")
 def execute_command(request: CommandRequest):
-    logger.info("COMMAND RECEIVED | text=%r | ollama=%s", request.text, request.use_ollama)
+    logger.info("COMMAND RECEIVED | text=%r | ollama=%s | session=%s", request.text, request.use_ollama, request.session_id)
+    previous = _PENDING_CLARIFICATIONS.pop(request.session_id, None)
+    command_text = f"Original request: {previous}\nUser clarification: {request.text}" if previous else request.text
     # Handle this fixed local workflow before Ollama so the wake phrase is deterministic.
-    if is_code_autometa_command(request.text):
+    if is_code_autometa_command(command_text):
         logger.info("ACTION START | tool=code_autometa_workflow")
         try:
             result = start_code_autometa_workflow()
@@ -209,7 +215,7 @@ def execute_command(request: CommandRequest):
         except (FileNotFoundError, RuntimeError, OSError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    close_intent = parse_close_command(request.text)
+    close_intent = parse_close_command(command_text)
     if close_intent is not None:
         logger.info("ACTION START | tool=close_app | app_id=%s | source=rules", close_intent.app_id)
         try:
@@ -233,11 +239,11 @@ def execute_command(request: CommandRequest):
     tool_name = None
     tool_arguments: dict = {}
     response_text = ""
-    normalized = request.text.lower()
+    normalized = command_text.lower()
 
     if request.use_ollama:
         try:
-            interpreted = understand_command(request.text)
+            interpreted = understand_command(command_text)
             source = "ollama"
             tool_name = interpreted.get("tool")
             tool_arguments = interpreted.get("arguments", {})
@@ -248,7 +254,7 @@ def execute_command(request: CommandRequest):
     # Deterministic local routing remains available if Ollama is offline or
     # declines a request that matches one of the explicitly supported tools.
     if tool_name is None:
-        launch_intent = parse_command(request.text)
+        launch_intent = parse_command(command_text)
         if launch_intent is not None:
             tool_name = "launch_app"
             tool_arguments = {"app_id": launch_intent.app_id}
@@ -257,8 +263,20 @@ def execute_command(request: CommandRequest):
         elif any(term in normalized for term in ("open windows", "all windows", "which apps are open", "what windows are open")):
             tool_name = "list_open_windows"
 
+    clarification_question = interpreted.get("clarification_question", "") if request.use_ollama and source == "ollama" else ""
+    if clarification_question:
+        _PENDING_CLARIFICATIONS[request.session_id] = command_text
+        return {"success": True, "needs_clarification": True, "message": clarification_question, "source": source}
+
+    if tool_name == "create_folder":
+        folder_path = str(tool_arguments.get("path", "")).strip()
+        if folder_path and "/" not in folder_path and "\\" not in folder_path:
+            _PENDING_CLARIFICATIONS[request.session_id] = command_text
+            question = f"Where should I create the '{folder_path}' folder? For example, Documents, Desktop, or a project directory."
+            return {"success": True, "needs_clarification": True, "message": question, "source": source}
+
     if tool_name is None:
-        logger.warning("COMMAND UNHANDLED | text=%r | source=%s", request.text, source)
+        logger.warning("COMMAND UNHANDLED | text=%r | source=%s", command_text, source)
         raise HTTPException(
             status_code=422,
             detail="I couldn't identify a supported action. Try opening an app or asking which window is active/open.",
