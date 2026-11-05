@@ -283,6 +283,12 @@ def execute_command(request: CommandRequest):
             tool_name = "get_active_window"
         elif any(term in normalized for term in ("open windows", "all windows", "which apps are open", "what windows are open")):
             tool_name = "list_open_windows"
+        elif any(term in normalized for term in ("open a new tab", "new browser tab", "open new tab")):
+            tool_name = "open_new_tab"
+        elif any(term in normalized for term in ("close this tab", "close current tab", "close browser tab")):
+            tool_name = "close_current_tab"
+        elif any(term in normalized for term in ("system status", "system information", "system specs", "cpu information", "disk space")):
+            tool_name = "get_system_status"
 
     clarification_question = interpreted.get("clarification_question", "") if request.use_ollama and source == "ollama" else ""
     if clarification_question:
