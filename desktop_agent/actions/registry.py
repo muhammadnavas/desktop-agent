@@ -72,6 +72,8 @@ class ToolRegistry:
 def _launch_app(app_id: str) -> dict[str, Any]:
     from desktop_agent.actions.apps import launch_app
 
+    if not isinstance(app_id, str) or not app_id.strip():
+        raise ValueError("app_id must be a non-empty string.")
     return launch_app(app_id)
 
 
