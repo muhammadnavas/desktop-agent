@@ -16,7 +16,7 @@ from desktop_agent.actions.desktop import capture_screenshot, execute_steps, val
 from desktop_agent.actions.workflows import is_code_autometa_command, start_code_autometa_workflow
 from desktop_agent.ollama_client import OllamaError, ollama_status, plan_desktop_task, understand_command
 from desktop_agent.parser import parse_command
-from desktop_agent.voice import voice_dependencies_status
+from desktop_agent.voice import speak_text, voice_dependencies_status
 from desktop_agent.voice_listener import WakeWordListener
 from desktop_agent import memory as agent_memory
 from desktop_agent.skills import get_skill, list_skills
@@ -27,11 +27,23 @@ _wake_listener: WakeWordListener | None = None
 
 
 def _handle_wake_command(transcript: str) -> None:
+    """Execute a spoken command and speak its actual outcome."""
     try:
-        execute_command(CommandRequest(text=transcript, use_ollama=True))
+        result = execute_command(CommandRequest(text=transcript, use_ollama=True))
+        response = result.get("message") or "Command completed."
+    except HTTPException as exc:
+        detail = exc.detail
+        response = detail if isinstance(detail, str) else "I couldn't complete that command."
+        logger.info("Voice command was not completed: %s", response)
     except Exception:
-        # Keep the listener alive, but never hide the reason a command failed.
+        response = "Something went wrong while running that command. Check the Desktop Agent logs."
         logger.exception("Could not execute voice command: %s", transcript)
+
+    try:
+        speak_text(response)
+    except Exception:
+        # Speech output is optional and must never stop the wake-word listener.
+        logger.exception("Could not speak the voice command response")
 
 
 @asynccontextmanager
