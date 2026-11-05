@@ -55,10 +55,11 @@ textarea{width:100%;min-height:96px;resize:vertical;padding:13px 14px;border:1px
 </main>
 <script>
 const form=document.querySelector("#command-form"),input=document.querySelector("#command"),statusBox=document.querySelector("#status");
+const conversationId=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():"web-"+Date.now();
 const run=document.querySelector("#run"),record=document.querySelector("#record"),pill=document.querySelector("#ollama-pill"),engine=document.querySelector("#engine");
 function show(message,kind=""){statusBox.className="status "+kind;statusBox.textContent=message}
 async function refreshStatus(){try{const r=await fetch("/api/ollama/status"),d=await r.json();if(d.connected&&d.model_available){pill.textContent="Ollama · "+d.configured_model;pill.className="pill ok";engine.textContent="Intent engine: local Ollama"}else if(d.connected){pill.textContent="Model not pulled";pill.className="pill";engine.textContent="Intent engine: rules fallback"}else{pill.textContent="Ollama offline";pill.className="pill";engine.textContent="Intent engine: rules fallback"}}catch{pill.textContent="Backend offline";engine.textContent="Intent engine: unavailable"}}
-async function sendCommand(text){show("Understanding your request…");run.disabled=true;try{const r=await fetch("/api/commands",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,use_ollama:true})});const d=await r.json();if(!r.ok)throw new Error(d.detail||"Command failed.");show(d.message+(d.source?" · "+d.source:""),d.success?"ok":"");}catch(e){show(e.message,"error")}finally{run.disabled=false}}
+async function sendCommand(text){show("Understanding your request…");run.disabled=true;try{const r=await fetch("/api/commands",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,use_ollama:true,session_id:conversationId})});const d=await r.json();if(!r.ok)throw new Error(d.detail||"Command failed.");show(d.message+(d.source?" · "+d.source:""),d.success?"ok":"");if(d.needs_clarification){input.value="";input.placeholder="Answer the agent’s question…";input.focus();}}catch(e){show(e.message,"error")}finally{run.disabled=false}}
 form.addEventListener("submit",e=>{e.preventDefault();if(input.value.trim())sendCommand(input.value.trim())});
 document.querySelectorAll("[data-command]").forEach(b=>b.addEventListener("click",()=>{input.value=b.dataset.command;sendCommand(input.value)}));
 document.querySelector("#refresh").addEventListener("click",refreshStatus);
