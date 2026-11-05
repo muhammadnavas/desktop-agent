@@ -2,12 +2,14 @@ from desktop_agent.permissions import classify_command_text, classify_tool
 
 
 def test_low_risk_tools_are_automatic():
-    for name in ("launch_app", "read_file", "create_folder", "get_active_window", "list_open_windows"):
+    for name in ("launch_app", "read_file", "get_active_window", "list_open_windows", "open_new_tab", "get_system_status"):
         assert classify_tool(name).level == "safe"
 
 
 def test_closing_apps_and_file_writes_need_approval():
     assert classify_tool("close_app").level == "approval"
+    assert classify_tool("close_current_tab").level == "approval"
+    assert classify_tool("create_folder").level == "approval"
     assert classify_tool("prepare_file_write").level == "approval"
 
 
