@@ -30,7 +30,7 @@ SKILLS = {
     "system_status": {
         "name": "Check system status",
         "description": "Read basic operating system, CPU, Python, hostname and disk information.",
-        "instructions": "Use get_system_status for read-only diagnostics. Do not claim to run arbitrary PowerShell, CMD, registry, service, shutdown, restart, or security commands; those are not exposed.",
+        "instructions": "Use get_system_status for basic read-only system details. Use run_diagnostic_command only with a fixed command_id from the tool allowlist (ipconfig, tasklist, whoami, systeminfo, and supported tool-version checks). Never construct arbitrary PowerShell, CMD, scripts, registry, service, shutdown, restart, or security commands.",
         "examples": ["Show my system information", "How much disk space is free?", "How many CPU cores do I have?"],
     },
     "file_management": {
