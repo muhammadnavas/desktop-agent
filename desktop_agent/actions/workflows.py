@@ -292,8 +292,53 @@ def _antigravity_launch(root: Path) -> tuple[list[str], str]:
     )
 
 
+def _start_servers_in_antigravity(antigravity_pid: int, frontend: Path, backend: Path) -> None:
+    """Open two integrated-terminal tabs in Antigravity and run the dev servers."""
+    try:
+        from pywinauto import Desktop
+        from pywinauto.keyboard import send_keys
+    except ImportError as exc:
+        raise RuntimeError(
+            'Integrated terminal automation requires the desktop extras. '
+            'Install with: pip install -e ".[desktop]"'
+        ) from exc
+
+    import time
+
+    desktop = Desktop(backend="uia")
+    window = None
+    deadline = time.monotonic() + 35
+    while time.monotonic() < deadline:
+        try:
+            window = next(
+                (item for item in desktop.windows(visible_only=True)
+                 if "antigravity" in item.window_text().casefold()),
+                None,
+            )
+            if window:
+                break
+        except Exception:
+            pass
+        time.sleep(0.5)
+
+    if window is None:
+        raise RuntimeError("Antigravity opened, but its window was not found for integrated-terminal setup.")
+
+    window.set_focus()
+    time.sleep(1.0)
+
+    # VS Code-style Antigravity uses Ctrl+Shift+OEM_3 to create a terminal.
+    send_keys("^+{VK_OEM_3}")
+    time.sleep(1.0)
+    send_keys(f"Set-Location -LiteralPath '{frontend}'; npm run dev" + "{ENTER}", with_spaces=True, pause=0.01)
+    time.sleep(0.5)
+    send_keys("^+{VK_OEM_3}")
+    time.sleep(1.0)
+    send_keys(f"Set-Location -LiteralPath '{backend}'; uvicorn main:app --reload" + "{ENTER}", with_spaces=True, pause=0.01)
+
+
 def start_code_autometa_workflow() -> dict[str, object]:
-    """Open Antigravity in the project and start frontend/backend in separate consoles."""
+    """Open Antigravity and run frontend/backend in its integrated terminal tabs."""
     if os.name != "nt":
         raise RuntimeError("The Code Autometa workflow currently supports Windows only.")
 
@@ -312,34 +357,18 @@ def start_code_autometa_workflow() -> dict[str, object]:
         raise FileNotFoundError(f"Backend main.py was not found: {backend}")
 
     antigravity_command, antigravity_cwd = _antigravity_launch(root)
-    new_console = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
-
-    # Fixed, allowlisted commands only; voice input is never interpolated.
+    # Launch the IDE first, then place both dev servers in its integrated terminal.
     antigravity = subprocess.Popen(
         antigravity_command,
         cwd=antigravity_cwd,
         shell=False,
-        creationflags=new_console,
     )
-    frontend_terminal = subprocess.Popen(
-        ["cmd.exe", "/k", "npm run dev"],
-        cwd=str(frontend),
-        shell=False,
-        creationflags=new_console,
-    )
-    backend_terminal = subprocess.Popen(
-        ["cmd.exe", "/k", "uvicorn main:app --reload"],
-        cwd=str(backend),
-        shell=False,
-        creationflags=new_console,
-    )
+    _start_servers_in_antigravity(antigravity.pid, frontend, backend)
 
     return {
         "status": "started",
         "workflow": "code_autometa",
         "project_root": str(root),
         "antigravity_pid": antigravity.pid,
-        "frontend_pid": frontend_terminal.pid,
-        "backend_pid": backend_terminal.pid,
-        "message": "Antigravity, frontend dev server, and backend Uvicorn were opened in separate windows.",
+        "message": "Antigravity opened with frontend and backend running in separate integrated-terminal tabs.",
     }
