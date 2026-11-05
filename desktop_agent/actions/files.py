@@ -235,3 +235,15 @@ def list_directory(path: str, limit: int = 100) -> dict[str, Any]:
             break
     return {"success": True, "path": str(target), "entries": entries,
             "count": len(entries), "truncated": truncated}
+
+
+
+def cancel_file_write(confirmation_token: str) -> dict[str, Any]:
+    """Discard a staged write without changing the target file."""
+    if not isinstance(confirmation_token, str) or not confirmation_token:
+        raise ValueError("A confirmation token is required.")
+    with _pending_lock:
+        pending = _pending_writes.pop(confirmation_token, None)
+    if pending is None:
+        raise KeyError("This staged write is invalid, expired, or already used.")
+    return {"success": True, "cancelled": True, "path": str(pending["path"])}
