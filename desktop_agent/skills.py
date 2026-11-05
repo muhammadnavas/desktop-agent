@@ -36,7 +36,7 @@ SKILLS = {
     "file_management": {
         "name": "Read and write workspace files",
         "description": "Read UTF-8 text files and stage new or edited files inside the configured workspace.",
-        "instructions": "Use read_file for UTF-8 text files. Use list_project_files to inspect source/config files and search_project to find literal text in a project. Use prepare_file_write to create or edit a file; it stages the change and returns a preview and one-time confirmation token. Show the target path, overwrite status and preview. Never claim a write is complete until the user confirms through POST /api/files/confirm-write. Folder creation also requires approval through POST /api/commands/confirm. Do not access secrets, credentials, browser profiles, or system files. Do not use shell commands for file operations.",
+        "instructions": "Use list_directory to inspect a folder, read_file for UTF-8 text files, list_project_files to inspect source/config files and search_project to find literal text in a project. Use prepare_file_write to create or edit a file; it stages the change and returns a preview and one-time confirmation token. Show the target path, overwrite status and preview. Never claim a write is complete until the user confirms through POST /api/files/confirm-write. Folder creation also requires approval through POST /api/commands/confirm. Do not access secrets, credentials, browser profiles, or system files. Do not use shell commands for file operations.",
         "examples": ["Read README.md", "Create notes/todo.txt with these tasks", "Update config/settings.json"],
     },
     "voice_command": {
