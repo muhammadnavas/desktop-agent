@@ -381,6 +381,8 @@ def execute_command(request: CommandRequest):
             "open_new_tab": f"Opened a new tab in {result.get('window', 'your browser')}.",
             "close_current_tab": f"Closed the current tab in {result.get('window', 'your browser')}.",
             "get_system_status": f"Your system is {result.get('system', 'running')} {result.get('release', '')}, with {result.get('logical_cpu_count') or 'an unknown number of'} logical CPUs" + (f" and {free_bytes / (1024 ** 3):.1f} GB free on {system_disk.get('root', 'the main drive')}." if isinstance(free_bytes, int) else "."),
+            "run_diagnostic_command": f"Diagnostic {result.get('command_id', 'command')} {'completed' if result.get('success') else 'returned an error'}." + (": " + str(result.get("output", ""))[:280] if result.get("output") else ""),
+            "list_directory": f"Found {result.get('count', 0)} items in {result.get('path', 'the directory')}." + (": " + ", ".join(item.get("name", "") for item in result.get("entries", [])[:8]) if result.get("entries") else " The directory is empty."),
             "read_file": f"Read {result.get('path', 'the requested file')}." + (f" The content starts: {file_excerpt}" if file_excerpt else " The file is empty."),
             "list_project_files": f"Found {result.get('count', 0)} project files" + (": " + ", ".join(result.get("files", [])[:8]) if result.get("files") else "."),
             "search_project": f"Found {len(matches)} matches in {result.get('files_inspected', 0)} files" + (": " + "; ".join(f"{m.get('file')} line {m.get('line')}" for m in matches[:5]) if matches else "."),
