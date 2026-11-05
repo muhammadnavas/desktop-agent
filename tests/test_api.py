@@ -763,3 +763,30 @@ def test_voice_approval_words_do_not_approve_dashboard_actions(monkeypatch):
     finally:
         api._last_voice_activity.clear()
         api._last_voice_activity.update(previous)
+
+
+def test_new_voice_command_cannot_replace_pending_approval(monkeypatch):
+    called = []
+    monkeypatch.setattr(api, "execute_command", lambda *_args, **_kwargs: called.append(True) or {})
+    monkeypatch.setattr(api, "speak_text", lambda _text: None)
+    token = "voice-pending-token-12345678901234567890"
+    api._PENDING_COMMAND_APPROVALS[token] = {
+        "tool": "close_app",
+        "arguments": {"app_id": "chrome"},
+        "created_at": api.time.monotonic(),
+    }
+    previous = dict(api._last_voice_activity)
+    api._last_voice_activity.update({
+        "transcript": "close Chrome",
+        "response": "Approval required.",
+        "pending_approval": {"token": token, "tool": "close_app", "message": "Approve Chrome close."},
+    })
+    try:
+        api._handle_wake_command("open Notepad")
+        assert called == []
+        assert api._last_voice_activity["pending_approval"]["token"] == token
+        assert "already an action waiting" in api._last_voice_activity["response"]
+    finally:
+        api._last_voice_activity.clear()
+        api._last_voice_activity.update(previous)
+        api._PENDING_COMMAND_APPROVALS.pop(token, None)
