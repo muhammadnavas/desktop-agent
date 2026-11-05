@@ -3,10 +3,13 @@ import pytest
 from desktop_agent.actions.registry import ToolDefinition, ToolRegistry, available_tools, execute_tool
 
 
-def test_default_registry_exposes_only_approved_app_launcher():
+def test_default_registry_exposes_approved_desktop_tools():
     tools = available_tools()
-    assert [tool["name"] for tool in tools] == ["launch_app"]
-    assert tools[0]["required_arguments"] == ["app_id"]
+    by_name = {tool["name"]: tool for tool in tools}
+    assert set(by_name) == {"launch_app", "get_active_window", "list_open_windows"}
+    assert by_name["launch_app"]["required_arguments"] == ["app_id"]
+    assert by_name["get_active_window"]["required_arguments"] == []
+    assert by_name["list_open_windows"]["required_arguments"] == []
 
 
 def test_registry_executes_registered_handler():
