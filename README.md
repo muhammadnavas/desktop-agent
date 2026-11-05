@@ -13,7 +13,7 @@ A local-first Windows desktop assistant with natural-language commands, local Ol
 - Natural-language tool routing: Ollama can select from registered tools, including app launching and read-only active/open-window inspection; tool names and arguments are strictly validated before execution.
 - Registered-tool execution: the model can only request explicitly registered actions; tool names, required arguments, extra arguments, and return types are validated, and execution outcomes and failures are logged. Ollama intent JSON is also checked against a strict schema before routing.
 - Persistent local memory: explicitly saved facts and preferences are stored in local MongoDB and supplied as context to the local intent model. Nothing is automatically saved from conversations.
-- Built-in skills: inspectable procedural guidance for app launching, Code Autometa, visible desktop tasks, and voice commands.
+- Built-in skills: inspectable procedural guidance for app launching, Code Autometa, visible desktop tasks, voice commands, and workspace file management.
 - Local screenshot capture and screenshot-aware planning through an Ollama vision model.
 - Mouse movement and clicks, safe keyboard navigation, typing, scrolling and bounded waits.
 - Every click/move is shown with its target description and coordinates before approval.
@@ -189,3 +189,10 @@ resolved again immediately before clicking, so stale or ambiguous controls
 will not be clicked. Only UIA controls of type `Button` are supported;
 labels associated with sensitive or destructive actions are blocked.
 This API is Windows-only.
+
+
+## Workspace file management
+
+The file-management skill can read UTF-8 text files and stage new or edited files using natural-language commands. The workspace defaults to the process working directory; set DESKTOP_AGENT_WORKSPACE to a dedicated project directory to restrict file access. Paths must be relative to this workspace. Reads and writes are limited to 1 MB, and binary files are not supported.
+
+Reading uses the registered read_file tool. Writing uses prepare_file_write, which returns a content preview and a one-time confirmation token but does not modify the disk. The user must explicitly approve the exact staged operation through POST /api/files/confirm-write with JSON {"confirmation_token":"..."}. Approval expires after two minutes and can only be used once. Existing files are replaced atomically only after approval. Do not use this feature for secrets, credentials, system files, or files outside the configured workspace.
