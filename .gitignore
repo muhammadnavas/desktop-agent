@@ -5,3 +5,8 @@ venv/
 .env
 .pytest_cache/
 .DS_Store
+
+# Local agent memory and runtime data
+/data/
+*.sqlite3
+*.db
