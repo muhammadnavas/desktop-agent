@@ -10,7 +10,8 @@ A local-first Windows desktop assistant with natural-language commands, local Ol
 - The model can only choose from a fixed application allowlist; arbitrary shell commands are never executed.
 - Deterministic parser fallback works when Ollama is unavailable.
 - Local screenshot capture and screenshot-aware planning through an Ollama vision model.
-- Mouse clicks, keyboard input, typing, scrolling and bounded waits.
+- Mouse movement and clicks, safe keyboard navigation, typing, scrolling and bounded waits.
+- Every click/move is shown with its target description and coordinates before approval.
 - Multi-step tasks are previewed and require explicit, one-time approval before execution.
 
 ## Requirements
