@@ -665,3 +665,18 @@ def test_pending_command_can_be_rejected_without_execution(monkeypatch):
         "confirmation_token": planned.json()["confirmation_token"]
     })
     assert replay.status_code == 404
+
+
+
+def test_voice_status_exposes_last_interaction():
+    monkeypatch = None
+    from desktop_agent import api as api_module
+    api_module._last_voice_activity.update({
+        "transcript": "open notepad",
+        "response": "Opening Notepad.",
+        "pending_approval": None,
+    })
+    response = client.get("/api/voice/status")
+    assert response.status_code == 200
+    assert response.json()["last_voice_activity"]["transcript"] == "open notepad"
+    assert response.json()["last_response"] == "Opening Notepad."
