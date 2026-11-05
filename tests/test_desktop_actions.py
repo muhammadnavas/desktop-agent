@@ -36,3 +36,8 @@ def test_rejects_out_of_range_scroll():
 def test_rejects_empty_plan():
     with pytest.raises(ValueError):
         validate_steps([])
+
+
+def test_rejects_typing_sensitive_credentials():
+    with pytest.raises(ValueError):
+        validate_steps([{"action": "type", "text": "my password is abc123"}])
