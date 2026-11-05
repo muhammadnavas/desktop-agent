@@ -51,7 +51,8 @@ def test_command_rejects_unknown_model_app(monkeypatch):
         lambda _text: {"action": "launch_app", "app_id": "powershell", "response": "Opening"},
     )
     response = client.post("/api/commands", json={"text": "open something"})
-    assert response.status_code == 422
+    assert response.status_code == 200
+    assert response.json()["success"] is False
 
 
 def test_voice_upload_rejects_payload_over_20mb():
