@@ -172,3 +172,37 @@ def test_tools_endpoint_lists_only_registered_tools():
     response = client.get("/api/tools")
     assert response.status_code == 200
     assert [tool["name"] for tool in response.json()["tools"]] == ["launch_app"]
+
+
+def test_memory_api_create_list_delete(monkeypatch, tmp_path):
+    from desktop_agent import memory
+
+    monkeypatch.setattr(memory, "DB_PATH", tmp_path / "api-memory.sqlite3")
+    created = client.post(
+        "/api/memories",
+        json={"content": "Preferred project model is Qwen", "category": "preference"},
+    )
+    assert created.status_code == 200
+    memory_id = created.json()["memory"]["id"]
+
+    listed = client.get("/api/memories?q=Qwen")
+    assert listed.status_code == 200
+    assert listed.json()["memories"][0]["id"] == memory_id
+
+    deleted = client.delete(f"/api/memories/{memory_id}")
+    assert deleted.status_code == 200
+    assert client.delete(f"/api/memories/{memory_id}").status_code == 404
+
+
+def test_skills_api_lists_and_reads_builtin_skill():
+    listed = client.get("/api/skills")
+    assert listed.status_code == 200
+    assert "desktop_task" in {item["id"] for item in listed.json()["skills"]}
+
+    detail = client.get("/api/skills/desktop_task")
+    assert detail.status_code == 200
+    assert "explicit approval" in detail.json()["instructions"]
+
+
+def test_unknown_skill_returns_404():
+    assert client.get("/api/skills/not-a-real-skill").status_code == 404
