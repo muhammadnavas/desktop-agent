@@ -694,3 +694,72 @@ def test_staged_file_write_can_be_cancelled_without_writing(monkeypatch, tmp_pat
     assert response.status_code == 200
     assert response.json()["cancelled"] is True
     assert not (tmp_path / "draft.txt").exists()
+
+
+def test_voice_yes_approves_only_pending_voice_action_once(monkeypatch):
+    executed = []
+    monkeypatch.setattr(api, "execute_tool", lambda name, arguments: executed.append((name, arguments)) or {"app": "Chrome"})
+    monkeypatch.setattr(api, "speak_text", lambda _text: None)
+    token = "voice-approval-token-12345678901234567890"
+    api._PENDING_COMMAND_APPROVALS[token] = {
+        "tool": "close_app",
+        "arguments": {"app_id": "chrome"},
+        "created_at": api.time.monotonic(),
+    }
+    previous = dict(api._last_voice_activity)
+    api._last_voice_activity.update({
+        "transcript": "close Chrome",
+        "response": "Closing Chrome requires approval.",
+        "pending_approval": {"token": token, "tool": "close_app", "message": "Approve Chrome close."},
+    })
+    try:
+        api._handle_wake_command("yes, approve")
+        assert executed == [("close_app", {"app_id": "chrome"})]
+        assert api._last_voice_activity["pending_approval"] is None
+        api._handle_wake_command("yes")
+        assert len(executed) == 1
+        assert api._last_voice_activity["response"] == "There isn't a pending voice approval."
+    finally:
+        api._last_voice_activity.clear()
+        api._last_voice_activity.update(previous)
+        api._PENDING_COMMAND_APPROVALS.pop(token, None)
+
+
+def test_voice_no_rejects_pending_voice_action_without_execution(monkeypatch):
+    executed = []
+    monkeypatch.setattr(api, "execute_tool", lambda *args: executed.append(args))
+    monkeypatch.setattr(api, "speak_text", lambda _text: None)
+    token = "voice-rejection-token-12345678901234567890"
+    api._PENDING_COMMAND_APPROVALS[token] = {
+        "tool": "close_app",
+        "arguments": {"app_id": "chrome"},
+        "created_at": api.time.monotonic(),
+    }
+    previous = dict(api._last_voice_activity)
+    api._last_voice_activity.update({
+        "transcript": "close Chrome",
+        "response": "Approval required.",
+        "pending_approval": {"token": token, "tool": "close_app", "message": "Approve Chrome close."},
+    })
+    try:
+        api._handle_wake_command("no, reject")
+        assert executed == []
+        assert token not in api._PENDING_COMMAND_APPROVALS
+        assert api._last_voice_activity["pending_approval"] is None
+        assert api._last_voice_activity["response"] == "Rejected. No changes were made."
+    finally:
+        api._last_voice_activity.clear()
+        api._last_voice_activity.update(previous)
+        api._PENDING_COMMAND_APPROVALS.pop(token, None)
+
+
+def test_voice_approval_words_do_not_approve_dashboard_actions(monkeypatch):
+    monkeypatch.setattr(api, "speak_text", lambda _text: None)
+    previous = dict(api._last_voice_activity)
+    api._last_voice_activity.update({"pending_approval": None})
+    try:
+        api._handle_wake_command("yes")
+        assert api._last_voice_activity["response"] == "There isn't a pending voice approval."
+    finally:
+        api._last_voice_activity.clear()
+        api._last_voice_activity.update(previous)
