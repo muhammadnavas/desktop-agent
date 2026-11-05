@@ -644,3 +644,24 @@ def test_diagnostic_command_has_rules_fallback(monkeypatch):
     })
     assert response.status_code == 200
     assert calls == [("run_diagnostic_command", {"command_id": "ipconfig"})]
+
+
+
+def test_pending_command_can_be_rejected_without_execution(monkeypatch):
+    executed = []
+    monkeypatch.setattr(api, "understand_command", lambda _text: {
+        "tool": "close_current_tab", "arguments": {}, "response": "Close the tab."
+    })
+    monkeypatch.setattr(api, "execute_tool", lambda *args: executed.append(args))
+    planned = client.post("/api/commands", json={"text": "Close this tab"})
+    assert planned.json()["needs_approval"] is True
+    rejected = client.post("/api/commands/cancel", json={
+        "confirmation_token": planned.json()["confirmation_token"]
+    })
+    assert rejected.status_code == 200
+    assert rejected.json()["cancelled"] is True
+    assert executed == []
+    replay = client.post("/api/commands/confirm", json={
+        "confirmation_token": planned.json()["confirmation_token"]
+    })
+    assert replay.status_code == 404
