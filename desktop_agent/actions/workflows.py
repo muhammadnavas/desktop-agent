@@ -293,7 +293,7 @@ def _antigravity_launch(root: Path) -> tuple[list[str], str]:
 
 
 def _start_servers_in_antigravity(antigravity_pid: int, frontend: Path, backend: Path) -> None:
-    """Open two integrated-terminal tabs in Antigravity and run the dev servers."""
+    """Create and focus Antigravity integrated terminals before typing server commands."""
     try:
         from pywinauto import Desktop
         from pywinauto.keyboard import send_keys
@@ -307,14 +307,15 @@ def _start_servers_in_antigravity(antigravity_pid: int, frontend: Path, backend:
 
     desktop = Desktop(backend="uia")
     window = None
-    deadline = time.monotonic() + 35
+    deadline = time.monotonic() + 40
     while time.monotonic() < deadline:
         try:
-            window = next(
-                (item for item in desktop.windows(visible_only=True)
-                 if "antigravity" in item.window_text().casefold()),
-                None,
-            )
+            # Prefer the main IDE window; do not accidentally target a terminal window.
+            candidates = [
+                item for item in desktop.windows(visible_only=True)
+                if "antigravity" in item.window_text().casefold()
+            ]
+            window = next((item for item in candidates if item.is_visible()), None)
             if window:
                 break
         except Exception:
@@ -322,19 +323,33 @@ def _start_servers_in_antigravity(antigravity_pid: int, frontend: Path, backend:
         time.sleep(0.5)
 
     if window is None:
-        raise RuntimeError("Antigravity opened, but its window was not found for integrated-terminal setup.")
+        raise RuntimeError("Antigravity opened, but its IDE window was not found.")
 
-    window.set_focus()
-    time.sleep(1.0)
+    def command_palette(command: str) -> None:
+        window.set_focus()
+        time.sleep(0.3)
+        send_keys("^+p")
+        time.sleep(0.5)
+        send_keys(command, with_spaces=True, pause=0.02)
+        time.sleep(0.3)
+        send_keys("{ENTER}")
+        time.sleep(1.0)
 
-    # VS Code-style Antigravity uses Ctrl+Shift+OEM_3 to create a terminal.
-    send_keys("^+{VK_OEM_3}")
-    time.sleep(1.0)
-    send_keys(f"Set-Location -LiteralPath '{frontend}'; npm run dev" + "{ENTER}", with_spaces=True, pause=0.01)
-    time.sleep(0.5)
-    send_keys("^+{VK_OEM_3}")
-    time.sleep(1.0)
-    send_keys(f"Set-Location -LiteralPath '{backend}'; uvicorn main:app --reload" + "{ENTER}", with_spaces=True, pause=0.01)
+    def create_terminal_and_run(command: str) -> None:
+        # Use the IDE command palette rather than relying on the terminal pane
+        # retaining keyboard focus after a new terminal is created.
+        command_palette("Terminal: Create New Terminal")
+        command_palette("Terminal: Focus on Terminal")
+        send_keys(command, with_spaces=True, pause=0.01)
+        send_keys("{ENTER}")
+        time.sleep(0.7)
+
+    create_terminal_and_run(
+        f"Set-Location -LiteralPath '{frontend}'; npm run dev"
+    )
+    create_terminal_and_run(
+        f"Set-Location -LiteralPath '{backend}'; uvicorn main:app --reload"
+    )
 
 
 def start_code_autometa_workflow() -> dict[str, object]:
