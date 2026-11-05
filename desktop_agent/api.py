@@ -3,7 +3,6 @@
 from pathlib import Path
 import secrets
 import time
-import re
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -22,7 +21,7 @@ app = FastAPI(
 )
 INDEX_FILE = Path(__file__).parent / "web" / "index.html"
 _PENDING_TASKS: dict[str, dict] = {}
-_BLOCKED_TASK_TERMS = re.compile(r"\\b(password|passcode|one.time.code|\\botp\\b|payment|pay\\b|purchase|checkout|delete|erase|format drive|bank account|credit card|security settings|change password)\\b", re.IGNORECASE)
+_BLOCKED_TASK_TERMS = ("password", "passcode", "one-time code", "otp", "payment", "purchase", "checkout", "delete", "erase", "format drive", "bank account", "credit card", "security settings", "change password")
 
 
 class CommandRequest(BaseModel):
@@ -141,7 +140,7 @@ def desktop_screenshot():
 
 @app.post("/api/tasks/plan")
 def create_task_plan(request: TaskPlanRequest):
-    if _BLOCKED_TASK_TERMS.search(request.text):
+    if any(term in request.text.lower() for term in _BLOCKED_TASK_TERMS):
         raise HTTPException(status_code=403, detail="This task involves a sensitive or destructive operation and is not supported by Desktop Agent.")
     try:
         screen = capture_screenshot()
