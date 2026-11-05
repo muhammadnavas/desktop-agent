@@ -42,3 +42,24 @@ def test_unknown_application_is_rejected():
 def test_non_string_response_is_rejected():
     with pytest.raises(OllamaError, match="must be text"):
         validate_command_intent({"action": "unsupported", "response": {"text": "bad"}}, APPS)
+
+
+def test_unexpected_intent_fields_are_rejected():
+    with pytest.raises(OllamaError, match="unexpected intent fields"):
+        validate_command_intent(
+            {
+                "action": "launch_app",
+                "app_id": "notepad",
+                "response": "Opening",
+                "command": "whoami",
+            },
+            APPS,
+        )
+
+
+def test_unsupported_intent_cannot_smuggle_an_app_id():
+    with pytest.raises(OllamaError, match="must not include an application id"):
+        validate_command_intent(
+            {"action": "unsupported", "app_id": "powershell", "response": "No"},
+            APPS,
+        )
