@@ -14,6 +14,7 @@ _APP_PATTERNS = {
     "calculator": (r"\bcalculator\b", r"\bcalc\b"),
     "explorer": (r"\bfile explorer\b", r"\bwindows explorer\b", r"\bexplorer\b"),
     "vscode": (r"\bvs\s*code\b", r"\bvisual studio code\b", r"\bcode editor\b"),
+    "whatsapp": (r"\bwhats\s*app\b", r"\bwhatsapp\b"),
 }
 
 
