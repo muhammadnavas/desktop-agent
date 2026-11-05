@@ -349,6 +349,9 @@ def execute_command(request: CommandRequest):
             "create_folder": f"Created folder {result.get('path', 'in workspace')}.",
             "get_active_window": f"Active window: {result.get('title') or 'No titled window found.'}",
             "list_open_windows": f"Found {result.get('count', 0)} open windows.",
+            "open_new_tab": f"Opened a new tab in {result.get('window', 'your browser')}.",
+            "close_current_tab": f"Closed the current tab in {result.get('window', 'your browser')}.",
+            "get_system_status": f"System status collected for {result.get('system', 'this computer')}.",
             "read_file": f"Read {result.get('path', 'the requested file')}.",
             "prepare_file_write": (
                 f"Prepared {result.get('path', 'the requested file')} for review. "
@@ -367,6 +370,34 @@ def execute_command(request: CommandRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except OSError as exc:
         raise HTTPException(status_code=500, detail=f"Windows could not complete the action: {exc}") from exc
+
+
+
+@app.post("/api/commands/confirm")
+def confirm_command(request: CommandConfirmRequest):
+    """Execute a previously reviewed command action exactly once."""
+    pending = _PENDING_COMMAND_APPROVALS.pop(request.confirmation_token, None)
+    if not pending:
+        raise HTTPException(status_code=404, detail="This approval is invalid, expired, or already used. Submit the command again.")
+    if time.monotonic() - pending["created_at"] > 90:
+        raise HTTPException(status_code=410, detail="This approval expired. Submit the command again.")
+    tool_name = pending["tool"]
+    if classify_tool(tool_name).level != "approval":
+        raise HTTPException(status_code=403, detail="This action is no longer eligible for approval.")
+    try:
+        result = execute_tool(tool_name, pending["arguments"])
+        messages = {
+            "close_app": f"Close requested for {result.get('app', 'the application')}.",
+            "close_current_tab": f"Closed the current tab in {result.get('window', 'your browser')}.",
+        }
+        return {"success": True, "tool": tool_name, "result": result,
+                "message": messages.get(tool_name, "Approved action completed."),
+                "source": "approved"}
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Windows could not complete the approved action: {exc}") from exc
+
 
 @app.post("/api/voice/transcribe")
 async def voice_transcribe(audio: UploadFile = File(...)):
@@ -408,6 +439,10 @@ class UIActionConfirmRequest(BaseModel):
     confirmation_token: str = Field(min_length=32, max_length=128)
 
 class FileWriteConfirmRequest(BaseModel):
+    confirmation_token: str = Field(min_length=32, max_length=128)
+
+
+class CommandConfirmRequest(BaseModel):
     confirmation_token: str = Field(min_length=32, max_length=128)
 
 
