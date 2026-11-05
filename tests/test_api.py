@@ -394,6 +394,12 @@ def test_create_folder_asks_for_destination_and_uses_follow_up(monkeypatch, tmp_
     second = client.post("/api/commands", json={"text": "Documents", "session_id": "folder-test"})
     assert second.status_code == 200
     assert second.json()["tool"] == "create_folder"
+    assert second.json()["needs_approval"] is True
+    assert not (tmp_path / "Documents" / "Projects").exists()
+    approved = client.post("/api/commands/confirm", json={
+        "confirmation_token": second.json()["confirmation_token"]
+    })
+    assert approved.status_code == 200
     assert (tmp_path / "Documents" / "Projects").is_dir()
 
 
@@ -442,6 +448,12 @@ def test_incomplete_folder_request_asks_for_name_then_destination(monkeypatch, t
     third = client.post("/api/commands", json={"text": "Documents", "session_id": "voice-folder"})
     assert third.status_code == 200
     assert third.json()["tool"] == "create_folder"
+    assert third.json()["needs_approval"] is True
+    assert not (tmp_path / "documents" / "projects").exists()
+    approved = client.post("/api/commands/confirm", json={
+        "confirmation_token": third.json()["confirmation_token"]
+    })
+    assert approved.status_code == 200
     assert (tmp_path / "documents" / "projects").is_dir()
 
 
@@ -503,7 +515,7 @@ def test_blocked_destructive_command_never_reaches_ollama_or_tools(monkeypatch):
     assert executed == []
 
 
-def test_safe_folder_creation_executes_without_approval(monkeypatch, tmp_path):
+def test_folder_creation_requires_approval(monkeypatch, tmp_path):
     monkeypatch.setenv("DESKTOP_AGENT_WORKSPACE", str(tmp_path))
     response = client.post("/api/commands", json={
         "text": "create folder called Projects in Documents",
@@ -511,7 +523,12 @@ def test_safe_folder_creation_executes_without_approval(monkeypatch, tmp_path):
     })
     assert response.status_code == 200
     assert response.json()["tool"] == "create_folder"
-    assert "needs_approval" not in response.json()
+    assert response.json()["needs_approval"] is True
+    assert not (tmp_path / "documents" / "projects").exists()
+    approved = client.post("/api/commands/confirm", json={
+        "confirmation_token": response.json()["confirmation_token"]
+    })
+    assert approved.status_code == 200
     assert (tmp_path / "documents" / "projects").is_dir()
 
 
