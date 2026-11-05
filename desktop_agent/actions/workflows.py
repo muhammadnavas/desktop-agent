@@ -135,49 +135,69 @@ def _uninstall_registry_paths() -> list[Path]:
 
 
 def _find_antigravity_exe() -> Path | None:
-    """Find the IDE using explicit override, PATH, registry, and common install paths."""
+    """Locate Antigravity across PATH, Windows registry, and common per-user installs."""
     override = os.environ.get("ANTIGRAVITY_EXE")
     if override:
-        candidate = Path(override).expanduser()
+        candidate = Path(os.path.expandvars(override)).expanduser()
         if candidate.is_file():
-            return candidate
+            return candidate.resolve()
 
-    for command in ("antigravity.exe", "antigravity"):
+    for command in ("Antigravity.exe", "antigravity.exe", "antigravity"):
         located = shutil.which(command)
-        if located:
-            return Path(located)
+        if located and Path(located).is_file():
+            return Path(located).resolve()
 
     registered = _registered_antigravity_path()
     if registered:
-        return registered
+        return registered.resolve()
     for candidate in _uninstall_registry_paths():
         if candidate.is_file():
-            return candidate
+            return candidate.resolve()
 
-    roots = [
-        Path(os.environ.get("LOCALAPPDATA", "")),
-        Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")),
-        Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")),
+    local = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    roaming = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+    program_files = Path(os.environ.get("PROGRAMFILES", r"C:\\Program Files"))
+    program_files_x86 = Path(os.environ.get("PROGRAMFILES(X86)", r"C:\\Program Files (x86)"))
+    user_profile = Path(os.environ.get("USERPROFILE", str(Path.home())))
+
+    candidates = [
+        local / "Programs" / "Antigravity" / "Antigravity.exe",
+        local / "Programs" / "Antigravity" / "Application" / "Antigravity.exe",
+        local / "Programs" / "Google" / "Antigravity" / "Antigravity.exe",
+        local / "Google" / "Antigravity" / "Antigravity.exe",
+        local / "Google" / "Antigravity" / "Application" / "Antigravity.exe",
+        roaming / "Antigravity" / "Antigravity.exe",
+        program_files / "Antigravity" / "Antigravity.exe",
+        program_files / "Google" / "Antigravity" / "Antigravity.exe",
+        program_files_x86 / "Antigravity" / "Antigravity.exe",
+        user_profile / "AppData" / "Local" / "Programs" / "Antigravity" / "Antigravity.exe",
     ]
-    candidates: list[Path] = []
-    for base in roots:
-        if not str(base) or not base.is_dir():
-            continue
-        candidates.extend(
-            [
-                base / "Programs" / "Antigravity" / "Antigravity.exe",
-                base / "Programs" / "Antigravity" / "Application" / "Antigravity.exe",
-                base / "Antigravity" / "Antigravity.exe",
-                base / "Google" / "Antigravity" / "Antigravity.exe",
-                base / "Google" / "Antigravity" / "Application" / "Antigravity.exe",
-            ]
-        )
-
     for candidate in candidates:
         if candidate.is_file():
-            return candidate
-    return None
+            return candidate.resolve()
 
+    # Installer layouts change over time. Search only likely install roots,
+    # prune unrelated/cache directories, and cap traversal to avoid a slow
+    # full-disk scan on every voice command.
+    search_roots = (local / "Programs", program_files, program_files_x86)
+    ignored = {"node_modules", ".git", "cache", "cacheddata", "temp", "tmp"}
+    visited = 0
+    for search_root in search_roots:
+        if not search_root.is_dir():
+            continue
+        for current, dirs, names in os.walk(search_root):
+            depth = len(Path(current).relative_to(search_root).parts)
+            dirs[:] = [name for name in dirs if name.casefold() not in ignored]
+            if depth >= 5:
+                dirs[:] = []
+            visited += 1
+            if visited > 3000:
+                return None
+            if "antigravity.exe" in {name.casefold() for name in names}:
+                match = Path(current) / next(name for name in names if name.casefold() == "antigravity.exe")
+                if match.is_file():
+                    return match.resolve()
+    return None
 
 def _antigravity_launch(root: Path) -> tuple[list[str], str]:
     """Prefer the Antigravity desktop IDE; fall back to its official agy CLI."""
