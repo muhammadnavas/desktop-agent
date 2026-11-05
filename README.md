@@ -139,7 +139,8 @@ python -m desktop_agent "Open Notepad"
 - `DELETE /api/memories/{memory_id}` — delete a saved memory
 - `GET /api/ollama/status` — Ollama and model status
 - `GET /api/diagnostics` — Python platform, Ollama, MongoDB memory connection, optional voice packages, listener state, and desktop dependency diagnostics
-- `POST /api/commands` — JSON: `{"text":"Open Notepad","use_ollama":true}`
+- `POST /api/commands` — JSON: `{"text":"Open Notepad","use_ollama":true}`; supports registered workspace file read and staged-write tools
+- `POST /api/files/confirm-write` — explicitly approve a staged workspace file write using its one-time confirmation token
 - `POST /api/voice/transcribe` — multipart upload with field name `audio`
 - `GET /api/desktop/screenshot` — capture the primary display
 - `POST /api/tasks/plan` — create a screenshot-aware plan without executing it
