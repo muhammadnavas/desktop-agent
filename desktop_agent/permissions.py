@@ -11,8 +11,10 @@ SAFE_TOOLS = frozenset({
     "get_active_window",
     "list_open_windows",
     "get_window_controls",
+    "open_new_tab",
+    "get_system_status",
 })
-APPROVAL_TOOLS = frozenset({"close_app", "prepare_file_write"})
+APPROVAL_TOOLS = frozenset({"close_app", "close_current_tab", "prepare_file_write"})
 
 # These operations are intentionally unavailable through natural-language routing.
 BLOCKED_COMMAND_PATTERNS = (
