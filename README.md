@@ -9,6 +9,9 @@ A local-first Windows desktop assistant with natural-language commands, local Ol
 - Local Ollama model interprets natural-language intent. No hosted LLM API key is needed.
 - The model can only choose from a fixed application allowlist; arbitrary shell commands are never executed.
 - Deterministic parser fallback works when Ollama is unavailable.
+- Local screenshot capture and screenshot-aware planning through an Ollama vision model.
+- Mouse clicks, keyboard input, typing, scrolling and bounded waits.
+- Multi-step tasks are previewed and require explicit, one-time approval before execution.
 
 ## Requirements
 
@@ -31,7 +34,7 @@ pip install -e .
 For offline voice transcription, install the optional dependency:
 
 ```powershell
-pip install -e ".[voice]"
+pip install -e ".[voice,desktop]"
 ```
 
 ## Configure Ollama
@@ -40,6 +43,7 @@ Install Ollama, then pull a local model:
 
 ```powershell
 ollama pull qwen2.5:3b
+ollama pull qwen2.5vl:3b
 ```
 
 Keep Ollama running. Desktop Agent uses these defaults:
@@ -47,6 +51,7 @@ Keep Ollama running. Desktop Agent uses these defaults:
 - `OLLAMA_URL=http://127.0.0.1:11434`
 - `OLLAMA_MODEL=qwen2.5:3b`
 - `WHISPER_MODEL=base` (optional local speech-to-text model)
+- `OLLAMA_VISION_MODEL=qwen2.5vl:3b` (local screenshot-understanding model)
 
 Override them in PowerShell if needed:
 
@@ -87,13 +92,20 @@ python -m desktop_agent "Open Notepad"
 - `GET /api/ollama/status` — Ollama and model status
 - `POST /api/commands` — JSON: `{"text":"Open Notepad","use_ollama":true}`
 - `POST /api/voice/transcribe` — multipart upload with field name `audio`
+- `GET /api/desktop/screenshot` — capture the primary display
+- `POST /api/tasks/plan` — create a screenshot-aware plan without executing it
+- `POST /api/tasks/confirm` — execute a plan with its one-time approval token
 
 ## Safety and current scope
 
 - The server binds to localhost by default.
 - Only allowlisted apps can be launched.
 - Commands use argument arrays and `shell=False`.
-- This version does not yet click arbitrary UI controls, type into other applications, or execute multi-step workflows. Those require a separate permission and verification layer.
+- Every desktop plan requires explicit confirmation and expires after two minutes.
+- Supported desktop actions are limited to click, type, safe key presses, scroll and short waits; arbitrary shell commands are not supported.
+- Move the mouse to the top-left corner for PyAutoGUI's emergency failsafe.
+- Do not use this version for passwords, payments, purchases, deleting data or account/security changes. Keep sensitive windows closed.
+- Screenshot understanding requires the separate vision model configured by `OLLAMA_VISION_MODEL`; the regular text model cannot interpret screenshots.
 
 ## Tests
 
@@ -104,8 +116,6 @@ pytest -q
 
 ## Roadmap
 
-1. Desktop screenshots and visual inspection
-2. Mouse and keyboard actions with explicit confirmation
-3. Multi-step task planning and execution verification
-4. Session memory, audit logs, retries, and recovery
-5. Wake-word and push-to-talk support
+1. Session memory, audit logs, retries and recovery
+2. Better task verification and interruption handling
+3. Wake-word and push-to-talk support
