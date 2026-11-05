@@ -18,6 +18,8 @@ from desktop_agent.ollama_client import OllamaError, ollama_status, plan_desktop
 from desktop_agent.parser import LaunchIntent, parse_command
 from desktop_agent.voice import voice_dependencies_status
 from desktop_agent.voice_listener import WakeWordListener
+from desktop_agent import memory as agent_memory
+from desktop_agent.skills import get_skill, list_skills
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +86,44 @@ def get_apps():
 def get_tools():
     """List the explicitly registered actions available to the agent."""
     return {"tools": available_tools()}
+
+
+class MemoryCreateRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=1000)
+    category: str = Field(default="general", max_length=40)
+
+
+@app.get("/api/memories")
+def get_memories(q: str | None = None, limit: int = 50):
+    return {"memories": agent_memory.list_memories(q, limit)}
+
+
+@app.post("/api/memories")
+def create_memory(request: MemoryCreateRequest):
+    try:
+        return {"success": True, "memory": agent_memory.remember(request.content, request.category)}
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.delete("/api/memories/{memory_id}")
+def remove_memory(memory_id: int):
+    if not agent_memory.delete_memory(memory_id):
+        raise HTTPException(status_code=404, detail="Memory not found.")
+    return {"success": True, "deleted_id": memory_id}
+
+
+@app.get("/api/skills")
+def get_skills():
+    return {"skills": list_skills()}
+
+
+@app.get("/api/skills/{skill_id}")
+def get_skill_details(skill_id: str):
+    try:
+        return get_skill(skill_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Skill not found.") from exc
 
 
 @app.get("/api/ollama/status")
