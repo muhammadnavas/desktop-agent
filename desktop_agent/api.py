@@ -280,6 +280,15 @@ def execute_command(request: CommandRequest):
     if command_permission.level == "blocked":
         logger.warning("COMMAND BLOCKED | text=%r | reason=%s", request.text, command_permission.reason)
         return {"success": False, "blocked": True, "message": command_permission.reason, "source": "permission_policy"}
+    normalized_request = normalize_spoken_command(request.text)
+    if "tab" in normalized_request and any(word in normalized_request.split() for word in ("close", "shut", "remove")):
+        current_tab_phrases = ("this tab", "current tab", "active tab", "close tab", "close this tab", "close current tab", "close browser tab")
+        if not any(phrase in normalized_request for phrase in current_tab_phrases):
+            return {
+                "success": False,
+                "message": "I can't identify or close a particular browser tab by its title or website yet. I did not close anything. I can only close the currently active tab after approval.",
+                "source": "capability_guard",
+            }
     previous = _PENDING_CLARIFICATIONS.pop(request.session_id, None)
     if previous:
         prior_folder = parse_create_folder_command(previous)
