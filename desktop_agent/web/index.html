@@ -28,6 +28,17 @@ textarea{width:100%;min-height:96px;resize:vertical;padding:13px 14px;border:1px
 .plan-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.plan-box{font-size:13px;color:#c6d5ea;white-space:pre-wrap;margin-top:12px}
 .preview{display:block;width:100%;max-height:420px;object-fit:contain;border:1px solid #34445e;border-radius:10px;margin-top:12px;background:#080d16;min-height:0}.preview[hidden]{display:none}
 .approve{background:#83d5ad;color:#082014;padding:11px 14px}.danger-note{color:#ffbf8e!important}
+.chat-log{display:flex;flex-direction:column;gap:10px;margin:16px 0;max-height:360px;overflow:auto}
+.chat-message{max-width:92%;padding:12px 14px;border:1px solid #34445e;border-radius:14px;background:#0b1423;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.55}
+.chat-message.user{align-self:flex-end;background:#1b2b43;border-color:#3b5476}
+.chat-message.agent{align-self:flex-start}.chat-message.error{border-color:#75414a;color:#ffb4bd}
+.chat-message .message-meta{display:block;color:#8193ad;font-size:11px;margin-bottom:5px}
+.approval-card{border:1px solid #b58a52;border-radius:13px;padding:14px;margin-top:12px;background:#211b13}
+.approval-card pre{max-height:180px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;color:#e5d6bd;font-size:12px}
+.approval-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.reject{background:#35232a;color:#ffd5dc;border:1px solid #75414a;padding:10px 13px}
+.result-details{margin-top:8px;color:#a9bad0;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.interaction-note{font-size:12px;color:#8fa1bb;margin-top:8px}
 @media(max-width:540px){body{padding:12px}main{padding:18px;border-radius:16px}.entry{flex-direction:column}button{min-height:44px}.entry button{width:100%}.desktop-panel{padding:15px}}
 </style>
 </head>
@@ -37,6 +48,8 @@ textarea{width:100%;min-height:96px;resize:vertical;padding:13px 14px;border:1px
 <div class="actions"><span id="voice-state" class="voice-indicator"><span class="voice-dot"></span><span>Starting Alexa wake-word detection…</span></span><button id="refresh" class="secondary" type="button">Refresh Ollama status</button></div>
 <div class="examples"><button class="chip" type="button" data-command="Open Notepad">Open Notepad</button><button class="chip" type="button" data-command="Launch Calculator">Calculator</button><button class="chip" type="button" data-command="Open File Explorer">File Explorer</button><button class="chip" type="button" data-command="Start VS Code">VS Code</button><button class="chip" type="button" data-command="Open WhatsApp">WhatsApp</button><button class="chip" type="button" data-command="Open a new tab">New browser tab</button><button class="chip" type="button" data-command="List project files in D:\\Projects">Project files</button><button class="chip" type="button" data-command="Show my system information">System status</button><button class="chip" type="button" data-command="Run ipconfig">IP configuration</button><button class="chip" type="button" data-command="Close this tab">Close tab</button></div>
 <div id="status" class="status" role="status" aria-live="polite">Ready. Say “Alexa” followed by a command, or type below.</div>
+<div id="chat-log" class="chat-log" aria-live="polite" aria-label="Conversation"></div>
+<div id="approval-area"></div>
 <div class="meta"><span id="engine">Intent engine: checking…</span><span>Localhost only</span></div>
 <section class="desktop-panel">
 <h2>Desktop eyes & hands</h2>
@@ -56,31 +69,128 @@ textarea{width:100%;min-height:96px;resize:vertical;padding:13px 14px;border:1px
 <script>
 const form=document.querySelector("#command-form"),input=document.querySelector("#command"),statusBox=document.querySelector("#status");
 const conversationId=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():"web-"+Date.now();
-const run=document.querySelector("#run"),record=document.querySelector("#record"),pill=document.querySelector("#ollama-pill"),engine=document.querySelector("#engine");
+const run=document.querySelector("#run"),pill=document.querySelector("#ollama-pill"),engine=document.querySelector("#engine");
+const chatLog=document.querySelector("#chat-log"),approvalArea=document.querySelector("#approval-area");
+const pendingClarification={active:false};
+let busy=false;
 function show(message,kind=""){statusBox.className="status "+kind;statusBox.textContent=message}
-async function refreshStatus(){try{const r=await fetch("/api/ollama/status"),d=await r.json();if(d.connected&&d.model_available){pill.textContent="Ollama · "+d.configured_model;pill.className="pill ok";engine.textContent="Intent engine: local Ollama"}else if(d.connected){pill.textContent="Model not pulled";pill.className="pill";engine.textContent="Intent engine: rules fallback"}else{pill.textContent="Ollama offline";pill.className="pill";engine.textContent="Intent engine: rules fallback"}}catch{pill.textContent="Backend offline";engine.textContent="Intent engine: unavailable"}}
-async function sendCommand(text){show("Understanding your request…");run.disabled=true;try{const r=await fetch("/api/commands",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,use_ollama:true,session_id:conversationId})});const d=await r.json();if(!r.ok)throw new Error(d.detail||"Command failed.");show(d.message+(d.source?" · "+d.source:""),d.success?"ok":"error");if(d.needs_clarification){input.value="";input.placeholder="Answer the agent’s question…";input.focus();}if(d.needs_approval){const approve=document.createElement("button");approve.type="button";approve.textContent="Approve this action";approve.className="primary";approve.addEventListener("click",async()=>{approve.disabled=true;try{const cr=await fetch("/api/commands/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirmation_token:d.confirmation_token})});const cd=await cr.json();if(!cr.ok)throw new Error(cd.detail||"Approval failed.");show(cd.message,"ok")}catch(e){show(e.message,"error")}finally{approve.remove()}});statusBox.appendChild(document.createTextNode(" "));statusBox.appendChild(approve);}}catch(e){show(e.message,"error")}finally{run.disabled=false}}
-form.addEventListener("submit",e=>{e.preventDefault();if(input.value.trim())sendCommand(input.value.trim())});
-document.querySelectorAll("[data-command]").forEach(b=>b.addEventListener("click",()=>{input.value=b.dataset.command;sendCommand(input.value)}));
+function addMessage(role,message,details="",kind=""){
+ const article=document.createElement("article");article.className="chat-message "+role+(kind?" "+kind:"");
+ const meta=document.createElement("span");meta.className="message-meta";meta.textContent=role==="user"?"YOU":"DESKTOP AGENT";
+ const body=document.createElement("div");body.textContent=message;
+ article.append(meta,body);
+ if(details){const extra=document.createElement("div");extra.className="result-details";extra.textContent=details;article.append(extra)}
+ chatLog.append(article);chatLog.scrollTop=chatLog.scrollHeight;
+}
+function setBusy(value){busy=value;run.disabled=value;run.textContent=value?"Working…":"Run command";document.querySelectorAll(".chip").forEach(b=>b.disabled=value)}
+async function requestJSON(url,options={}){
+ const response=await fetch(url,options);let data={};try{data=await response.json()}catch{}
+ if(!response.ok)throw new Error(data.detail||"Request failed ("+response.status+")");
+ return data;
+}
+async function refreshStatus(){
+ try{const d=await requestJSON("/api/ollama/status");
+ if(d.connected&&d.model_available){pill.textContent="Ollama · "+d.configured_model;pill.className="pill ok";engine.textContent="Intent engine: local Ollama"}
+ else if(d.connected){pill.textContent="Model not pulled";pill.className="pill";engine.textContent="Intent engine: rules fallback"}
+ else{pill.textContent="Ollama offline";pill.className="pill";engine.textContent="Intent engine: rules fallback"}
+ }catch{pill.textContent="Backend offline";engine.textContent="Intent engine: unavailable"}
+}
+function approvalCard({title,description,preview,confirmUrl,cancelUrl,token,onDone}){
+ const card=document.createElement("section");card.className="approval-card";
+ const heading=document.createElement("strong");heading.textContent=title;
+ const desc=document.createElement("p");desc.textContent=description;
+ card.append(heading,desc);
+ if(preview){const pre=document.createElement("pre");pre.textContent=preview;card.append(pre)}
+ const actions=document.createElement("div");actions.className="approval-actions";
+ const approve=document.createElement("button");approve.className="approve";approve.type="button";approve.textContent="Approve";
+ const reject=document.createElement("button");reject.className="reject";reject.type="button";reject.textContent="Reject";
+ const finish=()=>{approve.disabled=true;reject.disabled=true};
+ approve.addEventListener("click",async()=>{
+  finish();
+  try{const d=await requestJSON(confirmUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirmation_token:token})});
+   addMessage("agent",d.message||"Approved action completed.",d.result?JSON.stringify(d.result,null,2):"");
+   show(d.message||"Approved action completed.","ok");onDone?.(true,d);
+  }catch(e){addMessage("agent",e.message,"","error");show(e.message,"error");onDone?.(false)}
+  finally{card.remove()}
+ });
+ reject.addEventListener("click",async()=>{
+  finish();
+  try{if(cancelUrl)await requestJSON(cancelUrl,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirmation_token:token})});
+   addMessage("agent","Action rejected. No change was made.");show("Action rejected. No change was made.");
+  }catch(e){addMessage("agent",e.message,"","error");show(e.message,"error")}
+  finally{card.remove();onDone?.(false)}
+ });
+ actions.append(approve,reject);card.append(actions);approvalArea.append(card);
+}
+function showCommandResult(d){
+ const result=d.result||{};
+ let details="";
+ if(d.tool==="read_file")details=result.content||"(Empty file)";
+ else if(d.tool==="list_directory")details=(result.entries||[]).map(x=>(x.type==="directory"?"📁 ":"📄 ")+x.name).join("\n")||"No visible entries.";
+ else if(d.tool==="list_project_files")details=(result.files||[]).join("\n");
+ else if(d.tool==="search_project")details=(result.matches||[]).map(x=>x.file+":"+x.line+"  "+x.text).join("\n")||"No matches.";
+ else if(d.tool==="run_diagnostic_command")details=result.output||"No command output.";
+ else if(d.tool==="get_system_status"||d.tool==="get_active_window"||d.tool==="list_open_windows")details=JSON.stringify(result,null,2);
+ else if(d.tool==="prepare_file_write")details=result.preview||"";
+ addMessage("agent",d.message||"Command completed.",details,d.success===false?"error":"");
+ if(result.requires_confirmation&&result.confirmation_token){
+  approvalCard({title:result.overwrites_existing?"Review file overwrite":"Review new file",description:result.path+" · "+result.size_bytes+" bytes · expires in "+result.expires_in_seconds+" seconds. Nothing has been written yet.",preview:result.preview,confirmUrl:"/api/files/confirm-write",cancelUrl:"/api/files/cancel-write",token:result.confirmation_token});
+ }else if(d.needs_approval&&d.confirmation_token){
+  approvalCard({title:"Approval required: "+(d.tool||"desktop action"),description:d.message+" This exact action expires in "+d.expires_in_seconds+" seconds.",confirmUrl:"/api/commands/confirm",token:d.confirmation_token});
+ }
+}
+async function sendCommand(text){
+ if(busy||!text.trim())return;
+ addMessage("user",text);show("Understanding your request…");setBusy(true);
+ try{
+  const d=await requestJSON("/api/commands",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,use_ollama:true,session_id:conversationId})});
+  showCommandResult(d);
+  if(d.needs_clarification){pendingClarification.active=true;input.placeholder="Answer the agent’s question…";input.focus();show(d.message)}
+  else{pendingClarification.active=false;input.placeholder="Ask me to open apps, inspect files, search code…";show(d.message||"Done.",d.success===false?"error":"ok")}
+ }catch(e){addMessage("agent",e.message,"","error");show(e.message,"error")}
+ finally{setBusy(false);input.focus()}
+}
+form.addEventListener("submit",e=>{e.preventDefault();const value=input.value.trim();if(!value)return;input.value="";sendCommand(value)});
+document.querySelectorAll("[data-command]").forEach(b=>b.addEventListener("click",()=>{input.value=b.dataset.command;sendCommand(input.value);input.value=""}));
 document.querySelector("#refresh").addEventListener("click",refreshStatus);
 const voiceState=document.querySelector("#voice-state");
+let lastVoiceTranscript="",lastVoiceState="";
 async function refreshVoiceStatus(){
- try{
-  const r=await fetch("/api/voice/status"),d=await r.json();
-  const labels={starting:"Starting wake-word engine…",listening:"Listening for “Alexa”",command_listening:"Alexa detected · Listening for command",processing:"Processing your command…",unavailable:"Wake-word listener unavailable",error:"Wake-word listener error"};
-  voiceState.querySelector("span:last-child").textContent=labels[d.state]||"Voice listener status unknown";
-  voiceState.classList.toggle("active",d.state==="listening"||d.state==="command_listening");
-  if(d.last_error&&d.state==="unavailable")voiceState.title=d.last_error;
-  if(d.state==="processing"&&d.last_transcript)show("Heard: "+d.last_transcript);
+ try{const d=await requestJSON("/api/voice/status");
+ const labels={starting:"Starting wake-word engine…",listening:"Listening for “Alexa”",command_listening:"Alexa detected · Listening for command",processing:"Processing your command…",unavailable:"Wake-word listener unavailable",error:"Wake-word listener error",stopped:"Voice listener stopped"};
+ voiceState.querySelector("span:last-child").textContent=labels[d.state]||"Voice listener status unknown";
+ voiceState.classList.toggle("active",["listening","command_listening"].includes(d.state));
+ voiceState.title=d.last_error||"";
+ if(d.last_transcript&&d.last_transcript!==lastVoiceTranscript){lastVoiceTranscript=d.last_transcript;addMessage("user","🎙 "+d.last_transcript)}
+ if(lastVoiceState==="processing"&&d.state==="listening"){addMessage("agent","Voice command processed. Check spoken response and agent logs for details.")}
+ lastVoiceState=d.state;
  }catch{voiceState.querySelector("span:last-child").textContent="Voice listener status unavailable";voiceState.classList.remove("active")}
 }
-refreshStatus();refreshVoiceStatus();setInterval(refreshVoiceStatus,1000);
+document.querySelector("#refresh").addEventListener("click",()=>{refreshStatus();refreshVoiceStatus()});
 const screenshotButton=document.querySelector("#screenshot"),preview=document.querySelector("#screen-preview");
 const taskInput=document.querySelector("#task"),makePlan=document.querySelector("#make-plan");
 const approvePlan=document.querySelector("#approve-plan"),planBox=document.querySelector("#plan-box");
-let pendingToken=null;
-screenshotButton.addEventListener("click",async()=>{try{show("Capturing desktop…");const r=await fetch("/api/desktop/screenshot");const d=await r.json();if(!r.ok)throw new Error(d.detail||"Screenshot failed");preview.src=d.image;preview.hidden=false;show("Screenshot captured.","ok")}catch(e){show(e.message,"error")}});
-makePlan.addEventListener("click",async()=>{const text=taskInput.value.trim();if(!text){show("Describe the task first.","error");return}makePlan.disabled=true;approvePlan.hidden=true;pendingToken=null;planBox.textContent="Capturing screen and asking the local vision model to plan…";try{const r=await fetch("/api/tasks/plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});const d=await r.json();if(!r.ok)throw new Error(d.detail||"Could not create a plan");pendingToken=d.confirmation_token;if(d.screenshot?.image){preview.src=d.screenshot.image;preview.hidden=false}planBox.textContent=d.summary+"\n\n"+d.steps.map((s,i)=>(i+1)+". "+(s.action==="click"?"Click "+(s.target||"screen location")+" at ("+s.x+", "+s.y+")":s.action==="move"?"Move pointer to "+(s.target||"screen location")+" at ("+s.x+", "+s.y+")":s.action==="type"?"Type: "+s.text:s.action==="press"?"Press: "+s.keys.join(" + "):s.action==="scroll"?"Scroll "+s.amount:"Wait "+s.seconds+"s")).join("\n")+"\n\nApproval expires in "+d.expires_in_seconds+" seconds.";approvePlan.hidden=false;show("Plan ready. Review every step before approving.","ok")}catch(e){planBox.textContent="";show(e.message,"error")}finally{makePlan.disabled=false}});
-approvePlan.addEventListener("click",async()=>{if(!pendingToken)return;const token=pendingToken;pendingToken=null;approvePlan.disabled=true;approvePlan.hidden=true;show("Executing approved steps…");try{const r=await fetch("/api/tasks/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirmation_token:token})});const d=await r.json();if(!r.ok)throw new Error(d.detail||"Task execution failed");preview.src=d.screenshot.image;preview.hidden=false;planBox.textContent=d.summary+"\n\n"+d.steps.map(s=>"Step "+s.step+": "+s.status).join("\n");show("Task completed. Review the updated screenshot.","ok")}catch(e){show(e.message,"error")}finally{approvePlan.disabled=false}});
-refreshStatus();
+let pendingTaskToken=null;
+screenshotButton.addEventListener("click",async()=>{
+ screenshotButton.disabled=true;
+ try{show("Capturing desktop…");const d=await requestJSON("/api/desktop/screenshot");preview.src=d.image;preview.hidden=false;show("Screenshot captured.","ok")}
+ catch(e){show(e.message,"error")}finally{screenshotButton.disabled=false}
+});
+makePlan.addEventListener("click",async()=>{
+ const text=taskInput.value.trim();if(!text){show("Describe the task first.","error");return}
+ makePlan.disabled=true;approvePlan.hidden=true;pendingTaskToken=null;planBox.textContent="Capturing screen and asking the local vision model to plan…";
+ try{const d=await requestJSON("/api/tasks/plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text})});
+ pendingTaskToken=d.confirmation_token;if(d.screenshot?.image){preview.src=d.screenshot.image;preview.hidden=false}
+ planBox.textContent=d.summary+"\n\n"+d.steps.map((s,i)=>(i+1)+". "+(s.action==="click"?"Click "+(s.target||"screen location")+" at ("+s.x+", "+s.y+")":s.action==="move"?"Move pointer to "+(s.target||"screen location")+" at ("+s.x+", "+s.y+")":s.action==="type"?"Type: "+s.text:s.action==="press"?"Press: "+s.keys.join(" + "):s.action==="scroll"?"Scroll "+s.amount:"Wait "+s.seconds+"s")).join("\n")+"\n\nApproval expires in "+d.expires_in_seconds+" seconds.";
+ approvePlan.hidden=false;show("Plan ready. Review every step before approving.","ok")
+ }catch(e){planBox.textContent="";show(e.message,"error")}finally{makePlan.disabled=false}
+});
+approvePlan.addEventListener("click",async()=>{
+ if(!pendingTaskToken)return;const token=pendingTaskToken;pendingTaskToken=null;approvePlan.disabled=true;approvePlan.hidden=true;show("Executing approved steps…");
+ try{const d=await requestJSON("/api/tasks/confirm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({confirmation_token:token})});
+ if(d.screenshot?.image){preview.src=d.screenshot.image;preview.hidden=false}
+ planBox.textContent=d.summary+"\n\n"+d.steps.map(s=>"Step "+s.step+": "+s.status).join("\n");addMessage("agent",d.summary,planBox.textContent);show("Task completed. Review the updated screenshot.","ok")
+ }catch(e){show(e.message,"error");addMessage("agent",e.message,"","error")}finally{approvePlan.disabled=false}
+});
+refreshStatus();refreshVoiceStatus();setInterval(refreshVoiceStatus,1200);
 </script></body></html>
