@@ -159,6 +159,8 @@ class CommandConfirmRequest(BaseModel):
 
 
 _PENDING_CLARIFICATIONS: dict[str, str] = {}
+# Short-lived in-memory context, isolated per UI/voice session.
+_CONVERSATION_HISTORY: dict[str, list[dict[str, str]]] = {}
 
 
 @app.get("/")
@@ -328,11 +330,23 @@ def execute_command(request: CommandRequest):
     interpreted = {}
     if tool_name is None and request.use_ollama:
         try:
-            interpreted = understand_command(command_text)
+            history = _CONVERSATION_HISTORY.setdefault(request.session_id, [])
+            history.append({"role": "user", "content": command_text[:1000]})
+            history[:] = history[-10:]
+            interpreted = understand_command(command_text, conversation_history=history[:-1])
             source = "ollama"
             tool_name = interpreted.get("tool")
             tool_arguments = interpreted.get("arguments", {})
             response_text = interpreted.get("response", "")
+            assistant_context = (
+                "Selected tool: " + str(tool_name)
+                + "; arguments: " + str(tool_arguments)
+                + "; response: " + response_text
+                + ("; clarification: " + interpreted["clarification_question"]
+                   if interpreted.get("clarification_question") else "")
+            )
+            history.append({"role": "assistant", "content": assistant_context[:1200]})
+            history[:] = history[-10:]
         except OllamaError:
             source = "rules_fallback"
 
