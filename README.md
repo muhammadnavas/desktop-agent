@@ -10,7 +10,7 @@ A local-first Windows desktop assistant with natural-language commands, local Ol
 - Local Ollama model interprets natural-language intent. No hosted LLM API key is needed.
 - The model can only choose from a fixed application allowlist; arbitrary shell commands are never executed.
 - Deterministic parser fallback works when Ollama is unavailable.
-- Registered-tool execution: the model can only request explicitly registered actions; tool names, required arguments, extra arguments, and return types are validated, and execution outcomes and failures are logged. Ollama intent JSON is also checked against a strict schema before routing.
+- Registered-tool execution: the model can only request explicitly registered actions; tool names, required arguments, extra arguments, and return types are validated, and execution outcomes and failures are logged. Ollama intent JSON is also checked against a strict schema before routing.\n- Persistent local memory: explicitly saved facts and preferences are stored in SQLite and supplied as context to the local intent model. Nothing is automatically saved from conversations.\n- Built-in skills: inspectable procedural guidance for app launching, Code Autometa, visible desktop tasks, and voice commands.
 - Local screenshot capture and screenshot-aware planning through an Ollama vision model.
 - Mouse movement and clicks, safe keyboard navigation, typing, scrolling and bounded waits.
 - Every click/move is shown with its target description and coordinates before approval.
@@ -95,7 +95,7 @@ python -m desktop_agent "Open Notepad"
 
 - `GET /health` — health check
 - `GET /api/apps` — supported application allowlist
-- `GET /api/tools` — registered agent tools and their required arguments
+- `GET /api/tools` — registered agent tools and their required arguments\n- `GET /api/skills` and `GET /api/skills/{skill_id}` — discover built-in skills and inspect their instructions\n- `GET /api/memories` — list saved memories; supports `q` and `limit`\n- `POST /api/memories` — explicitly save a memory using JSON `{\"content\":\"...\",\"category\":\"preference\"}`\n- `DELETE /api/memories/{memory_id}` — delete a saved memory
 - `GET /api/ollama/status` — Ollama and model status
 - `GET /api/diagnostics` — Python platform, Ollama, optional voice packages, listener state, and desktop dependency diagnostics
 - `POST /api/commands` — JSON: `{"text":"Open Notepad","use_ollama":true}`
@@ -104,7 +104,7 @@ python -m desktop_agent "Open Notepad"
 - `POST /api/tasks/plan` — create a screenshot-aware plan without executing it
 - `POST /api/tasks/confirm` — execute a plan with its one-time approval token
 
-## Safety and current scope
+## Agent memory, skills, and tools\n\nMemories are stored locally in `data/agent_memory.sqlite3` by default. Set `DESKTOP_AGENT_MEMORY_DB` to choose another database path. Only facts explicitly submitted to `POST /api/memories` are saved; do not store passwords, API keys, authentication codes, or other secrets. The model receives the ten most recent saved facts as context. Built-in skills are guidance documents and do not grant additional execution permissions. Actual actions must still pass through the registered tool allowlist.\n\n## Safety and current scope
 
 - The server binds to localhost by default.
 - Only allowlisted apps can be launched.
