@@ -72,13 +72,43 @@ $env:WHISPER_MODEL="base"
 
 For a laptop with 4 GB VRAM, start with a quantized 3B Ollama model. Ollama may offload layers to system RAM/CPU depending on available memory. Local Whisper runs on CPU with int8 by default.
 
-## Run
+## Run manually
 
 ```powershell
-uvicorn desktop_agent.api:app --host 127.0.0.1 --port 8765
+python -m uvicorn desktop_agent.api:app --host 127.0.0.1 --port 8765
 ```
 
 Open http://127.0.0.1:8765.
+
+## Keep Desktop Agent running automatically
+
+To make Alexa available whenever you sign in to Windows, install the user-level
+Task Scheduler startup task **after installing the voice and desktop extras**:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install_startup.ps1
+```
+
+This registers `DesktopAgent-Alexa` to start the hidden background service at
+your Windows logon, using the project's `.venv` interpreter when present.
+The task is configured to restart the service if it exits unexpectedly. Logs
+are written to `%LOCALAPPDATA%\DesktopAgent\logs\agent.log`. The dashboard
+is available at `http://127.0.0.1:8765`; check
+`http://127.0.0.1:8765/api/voice/status` to confirm the Alexa listener says
+`listening`.
+
+To remove automatic startup:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\uninstall_startup.ps1
+```
+
+The microphone wake listener retries initialization after microphone, model,
+or audio-stream failures, with a backoff delay. This works while your Windows
+user session is active and the PC is awake. Sleep, hibernate, shutdown, a muted
+or disconnected microphone, and Windows microphone privacy permissions can
+prevent wake-word detection. This does not install a Windows service or bypass
+the normal user-session microphone permissions.
 
 ## Hands-free voice commands
 
