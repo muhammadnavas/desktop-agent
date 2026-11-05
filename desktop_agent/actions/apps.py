@@ -34,11 +34,12 @@ def close_app(app_id: str) -> dict[str, str]:
     process_images = {
         "notepad": "Notepad.exe",
         "calculator": "CalculatorApp.exe",
-        "explorer": "explorer.exe",
         "vscode": "Code.exe",
         "whatsapp": "WhatsApp.exe",
     }
     image = process_images.get(app_id)
+    if app_id == "explorer":
+        raise ValueError("Closing File Explorer is disabled because it can terminate the Windows shell.")
     if image is None:
         raise ValueError("That application is not on the approved app list.")
     completed = subprocess.run(
