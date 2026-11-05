@@ -246,3 +246,38 @@ def test_command_uses_rule_fallback_for_open_windows(monkeypatch):
     assert response.status_code == 200
     assert response.json()["tool"] == "list_open_windows"
     assert response.json()["result"]["count"] == 1
+
+
+def test_ui_button_click_requires_confirmation_and_is_single_use(monkeypatch):
+    from desktop_agent.actions import windows_uia
+
+    monkeypatch.setattr(windows_uia, "inspect_button_target", lambda window, button: {
+        "available": True, "window_title": window, "button_name": button,
+        "control_type": "Button", "enabled": True, "action": "click",
+    })
+    clicked = []
+    monkeypatch.setattr(windows_uia, "click_button",
+        lambda window, button: clicked.append((window, button)) or {"success": True})
+    plan = client.post("/api/ui-actions/plan-click",
+        json={"window_title": "Notepad", "button_name": "Save"})
+    assert plan.status_code == 200
+    payload = plan.json()
+    assert payload["requires_confirmation"] is True
+    assert payload["target"]["button_name"] == "Save"
+    assert clicked == []
+    approved = client.post("/api/ui-actions/confirm-click",
+        json={"confirmation_token": payload["confirmation_token"]})
+    assert approved.status_code == 200
+    assert clicked == [("Notepad", "Save")]
+    replay = client.post("/api/ui-actions/confirm-click",
+        json={"confirmation_token": payload["confirmation_token"]})
+    assert replay.status_code == 404
+
+
+def test_ui_button_click_plan_rejects_unavailable_target(monkeypatch):
+    from desktop_agent.actions import windows_uia
+    monkeypatch.setattr(windows_uia, "inspect_button_target",
+        lambda *_args: (_ for _ in ()).throw(ValueError("No unique button")))
+    response = client.post("/api/ui-actions/plan-click",
+        json={"window_title": "Notepad", "button_name": "Save"})
+    assert response.status_code == 400
