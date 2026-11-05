@@ -29,3 +29,14 @@ def test_matches_conversational_voice_transcription():
     assert is_code_autometa_command("it is a code automata")
     assert is_code_autometa_command("This is Code Automate")
     assert is_code_autometa_command("Alexa, please start Code Automata")
+
+
+def test_matches_multiple_filler_phrases_before_command():
+    assert is_code_autometa_command("Like this. Like so. Code automata.")
+    assert is_code_autometa_command("Alexa, like this, code automate")
+    assert is_code_autometa_command("Well, please, code auto meta")
+
+
+def test_rejects_extra_instruction_after_workflow_phrase():
+    assert not is_code_autometa_command("Code Autometa and delete all files")
+    assert not is_code_autometa_command("Code Automata then open Notepad")
