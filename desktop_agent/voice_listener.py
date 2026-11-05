@@ -142,5 +142,11 @@ class WakeWordListener:
                         else:
                             self._set_state("listening")
                         recording = []
+                        # Discard audio buffered while transcription/Ollama was running.
+                        while True:
+                            try:
+                                audio_queue.get_nowait()
+                            except queue.Empty:
+                                break
         except Exception as exc:
             self._set_state("unavailable", str(exc))
