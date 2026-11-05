@@ -69,6 +69,16 @@ class ToolRegistry:
             raise
 
 
+def _read_file(path: str) -> dict[str, Any]:
+    from desktop_agent.actions.files import read_file
+    return read_file(path)
+
+
+def _prepare_file_write(path: str, content: str) -> dict[str, Any]:
+    from desktop_agent.actions.files import prepare_file_write
+    return prepare_file_write(path, content)
+
+
 def _launch_app(app_id: str) -> dict[str, Any]:
     from desktop_agent.actions.apps import launch_app
 
@@ -90,6 +100,22 @@ def _list_open_windows() -> dict[str, Any]:
     return list_open_windows()
 
 
+registry.register(
+    ToolDefinition(
+        name="read_file",
+        description="Read a UTF-8 text file from the configured workspace using a relative path; maximum 1 MB.",
+        handler=_read_file,
+        required_arguments=("path",),
+    )
+)
+registry.register(
+    ToolDefinition(
+        name="prepare_file_write",
+        description="Stage creation or editing of a UTF-8 text file inside the configured workspace; returns a preview and one-time approval token and does not write until confirmed.",
+        handler=_prepare_file_write,
+        required_arguments=("path", "content"),
+    )
+)
 registry.register(
     ToolDefinition(
         name="launch_app",
