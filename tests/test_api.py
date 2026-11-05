@@ -25,7 +25,7 @@ def test_command_uses_rules_when_ollama_is_unavailable(monkeypatch):
         raise api.OllamaError("offline")
 
     monkeypatch.setattr(api, "understand_command", unavailable)
-    monkeypatch.setattr(api, "launch_app", lambda app_id: {"status": "launched", "app": app_id})
+    monkeypatch.setattr(api, "execute_tool", lambda _name, arguments: {"status": "launched", "app": arguments["app_id"]})
 
     response = client.post("/api/commands", json={"text": "Open Notepad"})
 
