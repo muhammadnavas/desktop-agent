@@ -181,8 +181,8 @@ def test_memory_api_create_list_delete(monkeypatch):
     import mongomock
     from desktop_agent import memory
 
-    client = mongomock.MongoClient()
-    monkeypatch.setattr(memory, "_client", client)
+    mongo_client = mongomock.MongoClient()
+    monkeypatch.setattr(memory, "_client", mongo_client)
     created = client.post(
         "/api/memories",
         json={"content": "Preferred project model is Qwen", "category": "preference"},
