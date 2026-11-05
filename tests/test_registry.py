@@ -6,11 +6,13 @@ from desktop_agent.actions.registry import ToolDefinition, ToolRegistry, availab
 def test_default_registry_exposes_approved_desktop_tools():
     tools = available_tools()
     by_name = {tool["name"]: tool for tool in tools}
-    assert set(by_name) == {"launch_app", "get_active_window", "list_open_windows", "get_window_controls"}
+    assert set(by_name) == {"launch_app", "get_active_window", "list_open_windows", "get_window_controls", "read_file", "prepare_file_write"}
     assert by_name["launch_app"]["required_arguments"] == ["app_id"]
     assert by_name["get_active_window"]["required_arguments"] == []
     assert by_name["list_open_windows"]["required_arguments"] == []
     assert by_name["get_window_controls"]["required_arguments"] == ["window_title"]
+    assert by_name["read_file"]["required_arguments"] == ["path"]
+    assert by_name["prepare_file_write"]["required_arguments"] == ["path", "content"]
 
 
 def test_registry_executes_registered_handler():
