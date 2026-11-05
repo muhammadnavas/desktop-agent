@@ -1,6 +1,7 @@
 """Small Ollama client using the local HTTP API (no cloud API key)."""
 
 import json
+import logging
 import os
 import urllib.error
 import urllib.request
@@ -18,6 +19,7 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
 OLLAMA_VISION_MODEL = os.getenv("OLLAMA_VISION_MODEL", "qwen2.5vl:3b")
 _TIMEOUT_SECONDS = 45
+logger = logging.getLogger(__name__)
 
 
 class OllamaError(RuntimeError):
@@ -69,7 +71,11 @@ def understand_command(text: str) -> dict:
     if not isinstance(text, str) or not text.strip():
         raise ValueError("Command text must be a non-empty string.")
     apps = supported_apps()
-    saved_context = memory_context(limit=10)
+    try:
+        saved_context = memory_context(limit=10)
+    except RuntimeError as exc:
+        logger.warning("MongoDB memory unavailable; continuing without memory context: %s", exc)
+        saved_context = ""
     skills = list_skills()
     tools = available_tools()
     system_prompt = (
