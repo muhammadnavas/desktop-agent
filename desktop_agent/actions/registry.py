@@ -110,6 +110,21 @@ def _list_open_windows() -> dict[str, Any]:
     return list_open_windows()
 
 
+def _open_new_tab() -> dict[str, Any]:
+    from desktop_agent.actions.browser_tabs import open_new_tab
+    return open_new_tab()
+
+
+def _close_current_tab() -> dict[str, Any]:
+    from desktop_agent.actions.browser_tabs import close_current_tab
+    return close_current_tab()
+
+
+def _get_system_status() -> dict[str, Any]:
+    from desktop_agent.actions.system import get_system_status
+    return get_system_status()
+
+
 registry.register(
     ToolDefinition(
         name="read_file",
@@ -187,3 +202,26 @@ def available_tools() -> list[dict[str, Any]]:
 def execute_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
     """Execute a tool only after registry and argument validation."""
     return registry.execute(name, arguments)
+
+
+registry.register(
+    ToolDefinition(
+        name="open_new_tab",
+        description="Open a new tab in the currently focused supported browser.",
+        handler=_open_new_tab,
+    )
+)
+registry.register(
+    ToolDefinition(
+        name="close_current_tab",
+        description="Close the active tab in a supported browser; requires explicit approval.",
+        handler=_close_current_tab,
+    )
+)
+registry.register(
+    ToolDefinition(
+        name="get_system_status",
+        description="Read basic Windows host, Python, CPU and disk usage information.",
+        handler=_get_system_status,
+    )
+)
