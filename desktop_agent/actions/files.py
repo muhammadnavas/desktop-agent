@@ -46,7 +46,7 @@ def read_file(path: str) -> dict[str, Any]:
     """Read a bounded UTF-8 text file from any accessible local path."""
     target = _resolve_workspace_file(path)
     if not target.exists() or not target.is_file():
-        raise FileNotFoundError(f"File not found in workspace: {path}")
+        raise FileNotFoundError(f"File not found: {path}")
     if target.stat().st_size > MAX_READ_BYTES:
         raise ValueError("File is larger than the 1 MB read limit.")
     try:
