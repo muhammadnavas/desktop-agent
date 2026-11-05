@@ -82,7 +82,7 @@ Open http://127.0.0.1:8765.
    - Open a terminal in `frontend` and run `npm run dev`.
    - Open another terminal in `backend` and run `uvicorn main:app --reload`.
 
-The default project path is `D:\\Projects\\Python\\ai-browser-automation-agent`. To change it, set `AI_BROWSER_AGENT_ROOT` before starting Desktop Agent. The workflow validates `frontend/package.json` and `backend/main.py` before launching anything. The microphone stays active while the API is running; wake-word detection and transcription run locally. On the first startup, openWakeWord downloads its pretrained model files into its package model directory; this requires an internet connection once. Later startups reuse the downloaded files.
+The default project path is `D:\\Projects\\Python\\ai-browser-automation-agent`. To change it, set `AI_BROWSER_AGENT_ROOT` before starting Desktop Agent. The workflow validates `frontend/package.json` and `backend/main.py` before launching anything. The microphone stays active while the API is running; wake-word detection and transcription run locally. On the first startup, openWakeWord downloads its pretrained model files into its package model directory; this requires an internet connection once. Later startups reuse the downloaded files. Missing voice extras or microphone/model initialization failures no longer prevent the API and dashboard from starting: check `GET /api/diagnostics` and `GET /api/voice/status` for the exact issue and install command.
 
 ## CLI
 
@@ -95,6 +95,7 @@ python -m desktop_agent "Open Notepad"
 - `GET /health` — health check
 - `GET /api/apps` — supported application allowlist
 - `GET /api/ollama/status` — Ollama and model status
+- `GET /api/diagnostics` — Python platform, Ollama, optional voice packages, listener state, and desktop dependency diagnostics
 - `POST /api/commands` — JSON: `{"text":"Open Notepad","use_ollama":true}`
 - `POST /api/voice/transcribe` — multipart upload with field name `audio`
 - `GET /api/desktop/screenshot` — capture the primary display
