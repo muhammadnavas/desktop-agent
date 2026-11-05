@@ -441,3 +441,41 @@ def test_model_cannot_open_an_app_not_mentioned_by_user(monkeypatch):
     assert response.status_code == 200
     assert response.json()["needs_clarification"] is True
     assert "Which supported app" in response.json()["message"]
+
+
+def test_file_tools_accept_absolute_paths_outside_workspace(monkeypatch, tmp_path):
+    from desktop_agent.actions.files import read_file, create_folder, prepare_file_write, confirm_file_write
+
+    workspace = tmp_path / "workspace"
+    outside = tmp_path / "outside"
+    workspace.mkdir()
+    outside.mkdir()
+    monkeypatch.setenv("DESKTOP_AGENT_WORKSPACE", str(workspace))
+
+    source = outside / "notes.txt"
+    source.write_text("outside workspace", encoding="utf-8")
+    assert read_file(str(source))["content"] == "outside workspace"
+
+    folder = outside / "new-folder"
+    created = create_folder(str(folder))
+    assert created["created"] is True
+    assert folder.is_dir()
+
+    target = outside / "created.txt"
+    staged = prepare_file_write(str(target), "approved content")
+    assert staged["path"] == str(target.resolve())
+    assert not target.exists()
+    result = confirm_file_write(staged["confirmation_token"])
+    assert result["path"] == str(target.resolve())
+    assert target.read_text(encoding="utf-8") == "approved content"
+
+
+def test_file_tools_allow_parent_traversal_for_relative_paths(monkeypatch, tmp_path):
+    from desktop_agent.actions.files import create_folder
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.setenv("DESKTOP_AGENT_WORKSPACE", str(workspace))
+    result = create_folder("../outside-folder")
+    assert result["created"] is True
+    assert (tmp_path / "outside-folder").is_dir()
