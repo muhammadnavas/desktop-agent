@@ -680,3 +680,17 @@ def test_voice_status_exposes_last_interaction():
     assert response.status_code == 200
     assert response.json()["last_voice_activity"]["transcript"] == "open notepad"
     assert response.json()["last_response"] == "Opening Notepad."
+
+
+
+def test_staged_file_write_can_be_cancelled_without_writing(monkeypatch, tmp_path):
+    from desktop_agent.actions import files
+
+    monkeypatch.setenv("DESKTOP_AGENT_WORKSPACE", str(tmp_path))
+    staged = files.prepare_file_write("draft.txt", "hello")
+    response = client.post("/api/files/cancel-write", json={
+        "confirmation_token": staged["confirmation_token"]
+    })
+    assert response.status_code == 200
+    assert response.json()["cancelled"] is True
+    assert not (tmp_path / "draft.txt").exists()
