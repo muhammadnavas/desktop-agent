@@ -61,3 +61,44 @@ def test_voice_upload_rejects_payload_over_20mb():
         files={"audio": ("large.webm", b"x" * (20 * 1024 * 1024 + 1), "audio/webm")},
     )
     assert response.status_code == 413
+
+
+def test_sensitive_desktop_task_is_blocked():
+    response = client.post("/api/tasks/plan", json={"text": "Please delete these files"})
+    assert response.status_code == 403
+
+
+def test_task_plan_requires_approval_and_is_single_use(monkeypatch):
+    monkeypatch.setattr(
+        api,
+        "capture_screenshot",
+        lambda: {"image": "data:image/png;base64,ZmFrZQ==", "width": 1200, "height": 800},
+    )
+    monkeypatch.setattr(
+        api,
+        "plan_desktop_task",
+        lambda *_args: {
+            "summary": "Open a page",
+            "steps": [{"action": "click", "x": 100, "y": 100}],
+        },
+    )
+    monkeypatch.setattr(api, "execute_steps", lambda *_args: [{"step": "1", "status": "completed"}])
+
+    plan = client.post("/api/tasks/plan", json={"text": "Open the visible browser tab"})
+    assert plan.status_code == 200
+    payload = plan.json()
+    assert payload["requires_confirmation"] is True
+    assert payload["screenshot"]["width"] == 1200
+
+    approved = client.post(
+        "/api/tasks/confirm",
+        json={"confirmation_token": payload["confirmation_token"]},
+    )
+    assert approved.status_code == 200
+    assert approved.json()["success"] is True
+
+    replay = client.post(
+        "/api/tasks/confirm",
+        json={"confirmation_token": payload["confirmation_token"]},
+    )
+    assert replay.status_code == 404
