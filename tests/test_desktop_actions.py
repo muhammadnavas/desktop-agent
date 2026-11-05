@@ -41,3 +41,27 @@ def test_rejects_empty_plan():
 def test_rejects_typing_sensitive_credentials():
     with pytest.raises(ValueError):
         validate_steps([{"action": "type", "text": "my password is abc123"}])
+
+def test_accepts_pointer_move_with_target():
+    steps = validate_steps([
+        {"action": "move", "x": 320, "y": 240, "target": "Search field", "duration": 0.5}
+    ])
+    assert steps[0]["action"] == "move"
+    assert steps[0]["target"] == "Search field"
+
+
+def test_rejects_clipboard_and_destructive_shortcuts():
+    for keys in (["ctrl", "x"], ["ctrl", "v"], ["ctrl", "c"], ["delete"]):
+        with pytest.raises(ValueError):
+            validate_steps([{"action": "press", "keys": keys}])
+
+
+def test_rejects_destructive_or_payment_text():
+    for value in ("delete these files", "make a payment", "purchase this item"):
+        with pytest.raises(ValueError):
+            validate_steps([{"action": "type", "text": value}])
+
+
+def test_rejects_invalid_pointer_move_duration():
+    with pytest.raises(ValueError):
+        validate_steps([{"action": "move", "x": 10, "y": 10, "duration": 10}])
