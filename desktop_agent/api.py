@@ -2,6 +2,7 @@
 
 from contextlib import asynccontextmanager
 import logging
+import re
 from pathlib import Path
 import secrets
 import time
@@ -15,7 +16,7 @@ from desktop_agent.actions.registry import available_tools, execute_tool
 from desktop_agent.actions.desktop import capture_screenshot, execute_steps, validate_steps
 from desktop_agent.actions.workflows import is_code_autometa_command, start_code_autometa_workflow
 from desktop_agent.ollama_client import OllamaError, ollama_status, plan_desktop_task, understand_command
-from desktop_agent.parser import parse_command, parse_close_command
+from desktop_agent.parser import parse_command, parse_close_command, parse_create_folder_command, normalize_spoken_command
 from desktop_agent.voice import speak_text, voice_dependencies_status
 from desktop_agent.voice_listener import WakeWordListener
 from desktop_agent import memory as agent_memory
@@ -239,9 +240,22 @@ def execute_command(request: CommandRequest):
     tool_name = None
     tool_arguments: dict = {}
     response_text = ""
-    normalized = command_text.lower()
+    normalized = normalize_spoken_command(command_text)
+    folder_intent = parse_create_folder_command(command_text)
+    if folder_intent is not None:
+        if not folder_intent.folder_name:
+            _PENDING_CLARIFICATIONS[request.session_id] = command_text
+            return {"success": True, "needs_clarification": True, "message": "What should I name the folder?", "source": "rules"}
+        if not folder_intent.destination:
+            _PENDING_CLARIFICATIONS[request.session_id] = command_text
+            question = "Where should I create '" + folder_intent.folder_name + "' inside your configured workspace? For example, Documents or Projects."
+            return {"success": True, "needs_clarification": True, "message": question, "source": "rules"}
+        tool_name = "create_folder"
+        tool_arguments = {"path": folder_intent.destination + "/" + folder_intent.folder_name}
+        source = "rules"
 
-    if request.use_ollama:
+    interpreted = {}
+    if tool_name is None and request.use_ollama:
         try:
             interpreted = understand_command(command_text)
             source = "ollama"
@@ -268,11 +282,20 @@ def execute_command(request: CommandRequest):
         _PENDING_CLARIFICATIONS[request.session_id] = command_text
         return {"success": True, "needs_clarification": True, "message": clarification_question, "source": source}
 
-    if tool_name == "create_folder":
-        folder_path = str(tool_arguments.get("path", "")).strip()
-        if folder_path and "/" not in folder_path and "\\" not in folder_path:
+
+    if tool_name == "launch_app":
+        app_id = tool_arguments.get("app_id")
+        app_patterns = {
+            "notepad": r"\bnotepad\b",
+            "calculator": r"\b(calculator|calc)\b",
+            "explorer": r"\b(explorer|file explorer)\b",
+            "vscode": r"\b(vs\s*code|visual studio code|code editor)\b",
+            "whatsapp": r"\b(whatsapp|whats\s*app)\b",
+        }
+        pattern = app_patterns.get(app_id)
+        if not pattern or not re.search(pattern, normalized):
             _PENDING_CLARIFICATIONS[request.session_id] = command_text
-            question = f"Which directory inside the configured workspace should contain '{folder_path}'? For example, enter 'projects' or 'work'."
+            question = "I heard a request to open an app, but could not confidently identify '" + str(app_id) + "'. Which supported app did you mean: Notepad, Calculator, File Explorer, VS Code, or WhatsApp?"
             return {"success": True, "needs_clarification": True, "message": question, "source": source}
 
     if tool_name is None:
