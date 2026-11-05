@@ -204,3 +204,33 @@ def search_project(root: str, query: str, limit: int = 30) -> dict[str, Any]:
                     if len(matches) >= limit:
                         return {"success": True, "root": str(base), "query": query, "files_inspected": inspected, "matches": matches, "truncated": True}
     return {"success": True, "root": str(base), "query": query, "files_inspected": inspected, "matches": matches, "truncated": False}
+
+
+def list_directory(path: str, limit: int = 100) -> dict[str, Any]:
+    """List a bounded set of files and folders in one directory."""
+    target = _resolve_workspace_file(path)
+    if not target.exists() or not target.is_dir():
+        raise FileNotFoundError(f"Directory not found: {path}")
+    if type(limit) is not int or not 1 <= limit <= 200:
+        raise ValueError("limit must be an integer between 1 and 200.")
+    sensitive_names = {".env", ".env.local", ".env.production", "id_rsa", "id_ed25519", ".ssh", ".aws", ".azure", ".gnupg"}
+    entries = []
+    truncated = False
+    for child in sorted(target.iterdir(), key=lambda item: (not item.is_dir(), item.name.casefold())):
+        name = child.name.casefold()
+        if name in sensitive_names or "credential" in name or "secret" in name or name.endswith((".pem", ".key")):
+            continue
+        try:
+            is_dir = child.is_dir()
+            entries.append({
+                "name": child.name,
+                "type": "directory" if is_dir else "file",
+                "size_bytes": None if is_dir else child.stat().st_size,
+            })
+        except OSError:
+            continue
+        if len(entries) >= limit:
+            truncated = True
+            break
+    return {"success": True, "path": str(target), "entries": entries,
+            "count": len(entries), "truncated": truncated}
