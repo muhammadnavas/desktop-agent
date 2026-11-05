@@ -369,3 +369,38 @@ def test_create_folder_rejects_parent_traversal(monkeypatch, tmp_path):
     import pytest
     with pytest.raises(ValueError):
         create_folder("../outside")
+
+
+def test_create_folder_asks_for_destination_and_uses_follow_up(monkeypatch, tmp_path):
+    monkeypatch.setenv("DESKTOP_AGENT_WORKSPACE", str(tmp_path))
+    calls = []
+    def interpret(text):
+        calls.append(text)
+        if len(calls) == 1:
+            return {"tool": "create_folder", "arguments": {"path": "Projects"}, "response": "Creating folder."}
+        assert "Original request:" in text
+        assert "User clarification: Documents" in text
+        return {"tool": "create_folder", "arguments": {"path": "Documents/Projects"}, "response": "Creating it in Documents."}
+    monkeypatch.setattr(api, "understand_command", interpret)
+    first = client.post("/api/commands", json={"text": "Create a folder called Projects", "session_id": "folder-test"})
+    assert first.status_code == 200
+    assert first.json()["needs_clarification"] is True
+    assert "Where should I create" in first.json()["message"]
+    assert not (tmp_path / "Projects").exists()
+    second = client.post("/api/commands", json={"text": "Documents", "session_id": "folder-test"})
+    assert second.status_code == 200
+    assert second.json()["tool"] == "create_folder"
+    assert (tmp_path / "Documents" / "Projects").is_dir()
+
+
+def test_model_clarification_is_returned_without_running_tool(monkeypatch):
+    executed = []
+    monkeypatch.setattr(api, "understand_command", lambda _text: {
+        "tool": None, "arguments": {}, "response": "",
+        "clarification_question": "Which directory should I use?",
+    })
+    monkeypatch.setattr(api, "execute_tool", lambda *args: executed.append(args))
+    response = client.post("/api/commands", json={"text": "Create a folder", "session_id": "clarify-test"})
+    assert response.status_code == 200
+    assert response.json()["needs_clarification"] is True
+    assert executed == []
