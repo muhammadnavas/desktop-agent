@@ -91,6 +91,10 @@ class CommandRequest(BaseModel):
     session_id: str = Field(default="default", min_length=1, max_length=80)
 
 
+class CommandConfirmRequest(BaseModel):
+    confirmation_token: str = Field(min_length=32, max_length=128)
+
+
 _PENDING_CLARIFICATIONS: dict[str, str] = {}
 
 
@@ -449,9 +453,6 @@ class UIActionConfirmRequest(BaseModel):
 class FileWriteConfirmRequest(BaseModel):
     confirmation_token: str = Field(min_length=32, max_length=128)
 
-
-class CommandConfirmRequest(BaseModel):
-    confirmation_token: str = Field(min_length=32, max_length=128)
 
 
 class TaskConfirmRequest(BaseModel):
