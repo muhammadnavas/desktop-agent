@@ -250,6 +250,8 @@ def execute_command(request: CommandRequest):
         logger.info("ACTION SUCCESS | tool=%s | result=%s", tool_name, result)
         default_messages = {
             "launch_app": f"Opening {result.get('app', 'application')}.",
+            "close_app": f"Close requested for {result.get('app', 'application')}.",
+            "create_folder": f"Created folder {result.get('path', 'in workspace')}.",
             "get_active_window": f"Active window: {result.get('title') or 'No titled window found.'}",
             "list_open_windows": f"Found {result.get('count', 0)} open windows.",
             "read_file": f"Read {result.get('path', 'the requested file')}.",
