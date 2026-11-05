@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 SAFE_TOOLS = frozenset({
     "launch_app",
-    "read_file", "list_project_files", "search_project",
+    "read_file", "list_directory", "list_project_files", "search_project",
     "get_active_window",
     "list_open_windows",
     "get_window_controls",
