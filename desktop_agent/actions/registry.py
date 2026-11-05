@@ -84,6 +84,16 @@ def _create_folder(path: str) -> dict[str, Any]:
     return create_folder(path)
 
 
+def _list_project_files(root: str, limit: int = 100) -> dict[str, Any]:
+    from desktop_agent.actions.files import list_project_files
+    return list_project_files(root, limit)
+
+
+def _search_project(root: str, query: str, limit: int = 30) -> dict[str, Any]:
+    from desktop_agent.actions.files import search_project
+    return search_project(root, query, limit)
+
+
 def _close_app(app_id: str) -> dict[str, Any]:
     from desktop_agent.actions.apps import close_app
     return close_app(app_id)
@@ -223,5 +233,23 @@ registry.register(
         name="get_system_status",
         description="Read basic Windows host, Python, CPU and disk usage information.",
         handler=_get_system_status,
+    )
+)
+
+
+registry.register(
+    ToolDefinition(
+        name="list_project_files",
+        description="List source and configuration files in a project, skipping common generated folders.",
+        handler=_list_project_files,
+        required_arguments=("root",),
+    )
+)
+registry.register(
+    ToolDefinition(
+        name="search_project",
+        description="Search literal text in bounded UTF-8 source files within a project.",
+        handler=_search_project,
+        required_arguments=("root", "query"),
     )
 )
