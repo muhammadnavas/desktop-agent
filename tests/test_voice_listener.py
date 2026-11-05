@@ -10,7 +10,6 @@ def policy(**overrides):
         "silence_seconds": 1.1,
         "max_command_seconds": 12.0,
         "speech_start_timeout": 5.0,
-        "min_speech_seconds": 0.24,
     }
     values.update(overrides)
     return should_finish_capture(**values)
