@@ -406,6 +406,15 @@ def execute_command(request: CommandRequest):
 
 
 
+@app.post("/api/commands/cancel")
+def cancel_command(request: CommandConfirmRequest):
+    """Discard a pending approval without executing its action."""
+    pending = _PENDING_COMMAND_APPROVALS.pop(request.confirmation_token, None)
+    if not pending:
+        raise HTTPException(status_code=404, detail="This approval is invalid, expired, or already used.")
+    return {"success": True, "cancelled": True, "tool": pending["tool"]}
+
+
 @app.post("/api/commands/confirm")
 def confirm_command(request: CommandConfirmRequest):
     """Execute a previously reviewed command action exactly once."""
