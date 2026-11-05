@@ -200,8 +200,8 @@ labels associated with sensitive or destructive actions are blocked.
 This API is Windows-only.
 
 
-## Workspace file management
+## Full filesystem access
 
-The file-management skill can read UTF-8 text files and stage new or edited files using natural-language commands. The workspace defaults to the process working directory; set DESKTOP_AGENT_WORKSPACE to a dedicated project directory to restrict file access. Paths must be relative to this workspace. Reads and writes are limited to 1 MB, and binary files are not supported.
+File tools can access any local path that the Windows account running Desktop Agent is permitted to access. You do not need to configure a workspace. Use an absolute path such as `C:\\Users\\Navas\\Desktop\\notes.txt`, a drive path, or a UNC path. Relative paths resolve from the agent's current working directory (or the optional `DESKTOP_AGENT_WORKSPACE` convenience setting). Parent-directory traversal is allowed. Normal Windows file permissions still apply; the agent cannot bypass administrator permissions, encryption, or files locked by another process.
 
-Reading uses the registered read_file tool. Writing uses prepare_file_write, which returns a content preview and a one-time confirmation token but does not modify the disk. The user must explicitly approve the exact staged operation through POST /api/files/confirm-write with JSON {"confirmation_token":"..."}. Approval expires after two minutes and can only be used once. Existing files are replaced atomically only after approval. Do not use this feature for secrets, credentials, system files, or files outside the configured workspace.
+Reading uses the registered `read_file` tool (UTF-8 text, maximum 1 MB). Writing uses `prepare_file_write`, which stages the exact absolute destination and content and returns a preview plus a one-time confirmation token. Nothing is written until you explicitly approve that exact operation through `POST /api/files/confirm-write`. Approval expires after two minutes and can only be used once. Existing files are atomically replaced only after approval. Binary files are not supported by these text-file tools. Folder creation can target any accessible absolute or relative path.
