@@ -168,10 +168,12 @@ def test_voice_status_is_actionable_when_listener_has_not_started():
         api._wake_listener = monkeypatch_listener
 
 
-def test_tools_endpoint_lists_only_registered_tools():
+def test_tools_endpoint_lists_registered_windows_tools():
     response = client.get("/api/tools")
     assert response.status_code == 200
-    assert [tool["name"] for tool in response.json()["tools"]] == ["launch_app"]
+    assert {tool["name"] for tool in response.json()["tools"]} == {
+        "launch_app", "get_active_window", "list_open_windows"
+    }
 
 
 def test_memory_api_create_list_delete(monkeypatch, tmp_path):
