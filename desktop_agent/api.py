@@ -95,7 +95,10 @@ class MemoryCreateRequest(BaseModel):
 
 @app.get("/api/memories")
 def get_memories(q: str | None = None, limit: int = 50):
-    return {"memories": agent_memory.list_memories(q, limit)}
+    try:
+        return {"memories": agent_memory.list_memories(q, limit)}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.post("/api/memories")
@@ -104,13 +107,18 @@ def create_memory(request: MemoryCreateRequest):
         return {"success": True, "memory": agent_memory.remember(request.content, request.category)}
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.delete("/api/memories/{memory_id}")
-def remove_memory(memory_id: int):
-    if not agent_memory.delete_memory(memory_id):
-        raise HTTPException(status_code=404, detail="Memory not found.")
-    return {"success": True, "deleted_id": memory_id}
+def remove_memory(memory_id: str):
+    try:
+        if not agent_memory.delete_memory(memory_id):
+            raise HTTPException(status_code=404, detail="Memory not found.")
+        return {"success": True, "deleted_id": memory_id}
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.get("/api/skills")
