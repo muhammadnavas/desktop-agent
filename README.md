@@ -14,6 +14,7 @@ A local-first Windows desktop assistant with natural-language commands, local Ol
 - Natural-language tool routing: Ollama can select from registered tools, including app launching and read-only active/open-window inspection; tool names and arguments are strictly validated before execution.
 - Registered-tool execution: the model can only request explicitly registered actions; tool names, required arguments, extra arguments, and return types are validated, and execution outcomes and failures are logged. Ollama intent JSON is also checked against a strict schema before routing.
 - Persistent local memory: explicitly saved facts and preferences are stored in local MongoDB and supplied as context to the local intent model. Nothing is automatically saved from conversations.
+- Built-in user context: a concise profile of known projects, technical vocabulary, and common speech-to-text variations is supplied to Ollama to improve intent recognition without granting extra permissions.
 - Built-in skills: inspectable procedural guidance for app launching, Code Autometa, visible desktop tasks, voice commands, and workspace file management.
 - Local screenshot capture and screenshot-aware planning through an Ollama vision model.
 - Mouse movement and clicks, safe keyboard navigation, typing, scrolling and bounded waits.
@@ -118,7 +119,7 @@ the normal user-session microphone permissions.
 2. Start the Desktop Agent API. Its backend listens locally for the **Alexa** wake word.
 3. Say **“Alexa”**, then speak a command. Recording stops after a short silence and faster-whisper transcribes it locally.
 4. The agent speaks a short response after each command. Detailed results remain available in the dashboard/API; long responses are shortened for speech.
-5. Say **“Alexa, code autometa”** to run the fixed development workflow for the AI Browser Automation Agent:
+5. Say **“Alexa, code autometa”** (also recognized when transcribed as “Code Automata”, “Code Automate”, or “Code Auto Meta”) to run the fixed development workflow for the AI Browser Automation Agent:
    - Open the project in Antigravity (or use the `agy` CLI if the IDE launcher is not found).
    - Open a terminal in `frontend` and run `npm run dev`.
    - Open another terminal in `backend` and run `uvicorn main:app --reload`.
@@ -148,6 +149,10 @@ python -m desktop_agent "Open Notepad"
 - `GET /api/desktop/screenshot` — capture the primary display
 - `POST /api/tasks/plan` — create a screenshot-aware plan without executing it
 - `POST /api/tasks/confirm` — execute a plan with its one-time approval token
+
+## User context, memory, skills, and tools
+
+The local intent model receives a built-in, non-sensitive user profile from `desktop_agent/user_context.py`. It describes the user's study area, known projects, tools, and vocabulary, including likely speech-to-text spellings such as Automata/Automate for Code Autometa. This helps resolve imperfect pronunciation and project references. It is context only: tool allowlists, path validation, and confirmation requirements remain unchanged. Edit that module to correct or extend the profile.
 
 ## Agent memory, skills, and tools
 
