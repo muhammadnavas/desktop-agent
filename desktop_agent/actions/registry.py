@@ -79,6 +79,16 @@ def _prepare_file_write(path: str, content: str) -> dict[str, Any]:
     return prepare_file_write(path, content)
 
 
+def _create_folder(path: str) -> dict[str, Any]:
+    from desktop_agent.actions.files import create_folder
+    return create_folder(path)
+
+
+def _close_app(app_id: str) -> dict[str, Any]:
+    from desktop_agent.actions.apps import close_app
+    return close_app(app_id)
+
+
 def _launch_app(app_id: str) -> dict[str, Any]:
     from desktop_agent.actions.apps import launch_app
 
@@ -114,6 +124,22 @@ registry.register(
         description="Stage creation or editing of a UTF-8 text file inside the configured workspace; returns a preview and one-time approval token and does not write until confirmed.",
         handler=_prepare_file_write,
         required_arguments=("path", "content"),
+    )
+)
+registry.register(
+    ToolDefinition(
+        name="create_folder",
+        description="Create a new folder inside the configured workspace using a relative path.",
+        handler=_create_folder,
+        required_arguments=("path",),
+    )
+)
+registry.register(
+    ToolDefinition(
+        name="close_app",
+        description="Request a graceful close of one allowlisted running Windows application.",
+        handler=_close_app,
+        required_arguments=("app_id",),
     )
 )
 registry.register(
