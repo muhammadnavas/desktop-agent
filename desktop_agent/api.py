@@ -23,22 +23,27 @@ from desktop_agent.skills import get_skill, list_skills
 
 logger = logging.getLogger(__name__)
 
+from desktop_agent.logging_config import configure_logging
+
 _wake_listener: WakeWordListener | None = None
 
 
 def _handle_wake_command(transcript: str) -> None:
     """Execute a spoken command and speak its actual outcome."""
+    logger.info("VOICE COMMAND RECEIVED | transcript=%r", transcript)
     try:
         result = execute_command(CommandRequest(text=transcript, use_ollama=True))
         response = result.get("message") or "Command completed."
+        logger.info("AGENT RESPONSE | success=%s source=%s tool=%s response=%s", result.get("success"), result.get("source"), result.get("tool", "workflow"), response)
     except HTTPException as exc:
         detail = exc.detail
         response = detail if isinstance(detail, str) else "I couldn't complete that command."
-        logger.info("Voice command was not completed: %s", response)
+        logger.warning("VOICE COMMAND FAILED | transcript=%r | response=%s", transcript, response)
     except Exception:
         response = "Something went wrong while running that command. Check the Desktop Agent logs."
         logger.exception("Could not execute voice command: %s", transcript)
 
+    logger.info("VOICE RESPONSE | %s", response)
     try:
         speak_text(response)
     except Exception:
@@ -49,6 +54,8 @@ def _handle_wake_command(transcript: str) -> None:
 @asynccontextmanager
 async def lifespan(_app):
     global _wake_listener
+    log_file = configure_logging()
+    logger.info("Desktop Agent started | activity_log=%s", log_file)
     _wake_listener = WakeWordListener(_handle_wake_command)
     try:
         _wake_listener.start()
@@ -191,10 +198,13 @@ def get_diagnostics():
 
 @app.post("/api/commands")
 def execute_command(request: CommandRequest):
+    logger.info("COMMAND RECEIVED | text=%r | ollama=%s", request.text, request.use_ollama)
     # Handle this fixed local workflow before Ollama so the wake phrase is deterministic.
     if is_code_autometa_command(request.text):
+        logger.info("ACTION START | tool=code_autometa_workflow")
         try:
             result = start_code_autometa_workflow()
+            logger.info("ACTION SUCCESS | tool=code_autometa_workflow | result=%s", result)
             return {"success": True, "message": result["message"], "result": result, "source": "workflow"}
         except (FileNotFoundError, RuntimeError, OSError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -228,13 +238,16 @@ def execute_command(request: CommandRequest):
             tool_name = "list_open_windows"
 
     if tool_name is None:
+        logger.warning("COMMAND UNHANDLED | text=%r | source=%s", request.text, source)
         raise HTTPException(
             status_code=422,
             detail="I couldn't identify a supported action. Try opening an app or asking which window is active/open.",
         )
 
     try:
+        logger.info("ACTION START | tool=%s | arguments=%s | source=%s", tool_name, tool_arguments, source)
         result = execute_tool(tool_name, tool_arguments)
+        logger.info("ACTION SUCCESS | tool=%s | result=%s", tool_name, result)
         default_messages = {
             "launch_app": f"Opening {result.get('app', 'application')}.",
             "get_active_window": f"Active window: {result.get('title') or 'No titled window found.'}",
