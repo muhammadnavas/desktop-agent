@@ -18,7 +18,7 @@ SKILLS = {
     "desktop_task": {
         "name": "Operate the visible desktop",
         "description": "Plan a bounded interaction with the current visible screen and request approval before execution.",
-        "instructions": "For read-only awareness, use get_active_window or list_open_windows. For interactions, use a fresh screenshot, create a bounded plan, show every step, and require explicit approval. Never enter passwords, perform payments, delete data, or change security settings.",
+        "instructions": "For read-only awareness, use get_active_window or list_open_windows. To inspect a window's accessible controls, use get_window_controls with its title; it returns names and types only, never field values. For interactions, use a fresh screenshot, create a bounded plan, show every step, and require explicit approval. Never enter passwords, perform payments, delete data, or change security settings.",
         "examples": ["Click the visible Settings button", "Scroll down this page"],
     },
     "voice_command": {
