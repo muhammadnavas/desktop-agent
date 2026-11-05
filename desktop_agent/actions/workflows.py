@@ -23,19 +23,28 @@ def is_code_autometa_command(text: str) -> bool:
     }
 
 
-def _agy_command() -> str:
-    executable = shutil.which("agy")
-    if executable:
-        return executable
-
+def _antigravity_launch(root: Path) -> tuple[list[str], str]:
+    """Prefer the Antigravity desktop IDE; fall back to its official agy CLI."""
+    ide = shutil.which("antigravity")
     local_app_data = os.environ.get("LOCALAPPDATA")
+    if ide:
+        return [ide, str(root)], str(root)
+
     if local_app_data:
-        candidate = Path(local_app_data) / "agy" / "bin" / "agy.exe"
-        if candidate.is_file():
-            return str(candidate)
+        ide_candidate = Path(local_app_data) / "Programs" / "Antigravity" / "Antigravity.exe"
+        if ide_candidate.is_file():
+            return [str(ide_candidate), str(root)], str(root)
+
+        agy_candidate = Path(local_app_data) / "agy" / "bin" / "agy.exe"
+        if agy_candidate.is_file():
+            return ["cmd.exe", "/k", f'"{agy_candidate}"'], str(root)
+
+    agy = shutil.which("agy")
+    if agy:
+        return ["cmd.exe", "/k", f'"{agy}"'], str(root)
 
     raise FileNotFoundError(
-        "Antigravity CLI 'agy' was not found. Install the Antigravity CLI and ensure agy is on PATH."
+        "Antigravity IDE or CLI was not found. Install Antigravity, or install its CLI and add agy to PATH."
     )
 
 
@@ -58,14 +67,14 @@ def start_code_autometa_workflow() -> dict[str, object]:
     if not (backend / "main.py").is_file():
         raise FileNotFoundError(f"Backend main.py was not found: {backend}")
 
-    agy = _agy_command()
+    antigravity_command, antigravity_cwd = _antigravity_launch(root)
     new_console = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
 
     # Each process gets its own terminal window. Commands and paths are fixed
     # by this allowlisted workflow; voice input is never interpolated.
     antigravity = subprocess.Popen(
-        ["cmd.exe", "/k", f'"{agy}"'],
-        cwd=str(root),
+        antigravity_command,
+        cwd=antigravity_cwd,
         shell=False,
         creationflags=new_console,
     )
