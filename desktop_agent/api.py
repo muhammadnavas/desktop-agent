@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 from desktop_agent.logging_config import configure_logging
 
 _wake_listener: WakeWordListener | None = None
+_last_voice_activity: dict = {"transcript": "", "response": "", "pending_approval": None}
 
 
 def _handle_wake_command(transcript: str) -> None:
@@ -36,13 +37,25 @@ def _handle_wake_command(transcript: str) -> None:
     try:
         result = execute_command(CommandRequest(text=transcript, use_ollama=True, session_id="voice"))
         response = result.get("message") or "Command completed."
+        _last_voice_activity.update({
+            "transcript": transcript,
+            "response": response,
+            "pending_approval": {
+                "token": result.get("confirmation_token"),
+                "tool": result.get("tool"),
+                "message": response,
+                "expires_in_seconds": result.get("expires_in_seconds", 90),
+            } if result.get("needs_approval") and result.get("confirmation_token") else None,
+        })
         logger.info("AGENT RESPONSE | success=%s source=%s tool=%s response=%s", result.get("success"), result.get("source"), result.get("tool", "workflow"), response)
     except HTTPException as exc:
         detail = exc.detail
         response = detail if isinstance(detail, str) else "I couldn't complete that command."
+        _last_voice_activity.update({"transcript": transcript, "response": response, "pending_approval": None})
         logger.warning("VOICE COMMAND FAILED | transcript=%r | response=%s", transcript, response)
     except Exception:
         response = "Something went wrong while running that command. Check the Desktop Agent logs."
+        _last_voice_activity.update({"transcript": transcript, "response": response, "pending_approval": None})
         logger.exception("Could not execute voice command: %s", transcript)
 
     logger.info("VOICE RESPONSE | %s", response)
@@ -179,7 +192,8 @@ def get_voice_status():
             "wake_word": "Alexa",
             "last_error": "The application lifespan has not started the listener.",
         }
-    return _wake_listener.status()
+    return {**_wake_listener.status(), "last_response": _last_voice_activity["response"],
+            "last_voice_activity": dict(_last_voice_activity)}
 
 
 @app.get("/api/diagnostics")
