@@ -161,6 +161,7 @@ def get_diagnostics():
     voice = voice_dependencies_status()
     voice["listener"] = get_voice_status()
     desktop_installed = find_spec("pyautogui") is not None
+    uia_installed = find_spec("pywinauto") is not None
     ollama = ollama_status()
     return {
         "application": {"status": "ok", "python": platform.python_version(), "platform": platform.platform()},
@@ -170,7 +171,8 @@ def get_diagnostics():
         "desktop": {
             "supported_platform": platform.system() == "Windows",
             "pyautogui_installed": desktop_installed,
-            "install_command": "pip install -e .[desktop]" if not desktop_installed else None,
+            "pywinauto_installed": uia_installed,
+            "install_command": 'pip install -e ".[desktop]"' if not (desktop_installed and uia_installed) else None,
         },
     }
 
