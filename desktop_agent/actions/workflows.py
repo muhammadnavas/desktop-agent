@@ -156,8 +156,8 @@ def _find_antigravity_exe() -> Path | None:
 
     local = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
     roaming = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
-    program_files = Path(os.environ.get("PROGRAMFILES", r"C:\\Program Files"))
-    program_files_x86 = Path(os.environ.get("PROGRAMFILES(X86)", r"C:\\Program Files (x86)"))
+    program_files = Path(os.environ.get("PROGRAMFILES", r"C:\Program Files"))
+    program_files_x86 = Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"))
     user_profile = Path(os.environ.get("USERPROFILE", str(Path.home())))
 
     candidates = [
