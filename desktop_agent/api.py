@@ -164,6 +164,7 @@ def get_diagnostics():
     return {
         "application": {"status": "ok", "python": platform.python_version(), "platform": platform.platform()},
         "ollama": ollama,
+        "memory": agent_memory.mongo_status(),
         "voice": voice,
         "desktop": {
             "supported_platform": platform.system() == "Windows",
