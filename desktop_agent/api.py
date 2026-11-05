@@ -205,7 +205,16 @@ def get_diagnostics():
 def execute_command(request: CommandRequest):
     logger.info("COMMAND RECEIVED | text=%r | ollama=%s | session=%s", request.text, request.use_ollama, request.session_id)
     previous = _PENDING_CLARIFICATIONS.pop(request.session_id, None)
-    command_text = f"Original request: {previous}\nUser clarification: {request.text}" if previous else request.text
+    if previous:
+        prior_folder = parse_create_folder_command(previous)
+        if prior_folder is not None and not prior_folder.folder_name:
+            command_text = "create folder called " + request.text.strip()
+        elif prior_folder is not None and prior_folder.folder_name and not prior_folder.destination:
+            command_text = "create folder called " + prior_folder.folder_name + " in " + request.text.strip()
+        else:
+            command_text = "Original request: " + previous + " User clarification: " + request.text
+    else:
+        command_text = request.text
     # Handle this fixed local workflow before Ollama so the wake phrase is deterministic.
     if is_code_autometa_command(command_text):
         logger.info("ACTION START | tool=code_autometa_workflow")
