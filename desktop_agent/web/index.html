@@ -56,19 +56,51 @@ textarea{width:100%;min-height:96px;resize:vertical;padding:13px 14px;border:1px
 <script>
 const form=document.querySelector("#command-form"),input=document.querySelector("#command"),statusBox=document.querySelector("#status");
 const run=document.querySelector("#run"),record=document.querySelector("#record"),pill=document.querySelector("#ollama-pill"),engine=document.querySelector("#engine");
-let mediaRecorder=null,chunks=[],recording=false;
+let mediaRecorder=null,chunks=[],recording=false,audioContext=null,analyser=null,meterTimer=null;
+let speechDetected=false,lastVoiceAt=0,recordingStartedAt=0;
+const SILENCE_MS=1400, SPEECH_THRESHOLD=0.018, NO_SPEECH_TIMEOUT_MS=8000, MAX_RECORDING_MS=20000;
 function show(message,kind=""){statusBox.className="status "+kind;statusBox.textContent=message}
 async function refreshStatus(){try{const r=await fetch("/api/ollama/status"),d=await r.json();if(d.connected&&d.model_available){pill.textContent="Ollama · "+d.configured_model;pill.className="pill ok";engine.textContent="Intent engine: local Ollama"}else if(d.connected){pill.textContent="Model not pulled";pill.className="pill";engine.textContent="Intent engine: rules fallback"}else{pill.textContent="Ollama offline";pill.className="pill";engine.textContent="Intent engine: rules fallback"}}catch{pill.textContent="Backend offline";engine.textContent="Intent engine: unavailable"}}
 async function sendCommand(text){show("Understanding your request…");run.disabled=true;try{const r=await fetch("/api/commands",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,use_ollama:true})});const d=await r.json();if(!r.ok)throw new Error(d.detail||"Command failed.");show(d.message+(d.source?" · "+d.source:""),d.success?"ok":"");}catch(e){show(e.message,"error")}finally{run.disabled=false}}
 form.addEventListener("submit",e=>{e.preventDefault();if(input.value.trim())sendCommand(input.value.trim())});
 document.querySelectorAll("[data-command]").forEach(b=>b.addEventListener("click",()=>{input.value=b.dataset.command;sendCommand(input.value)}));
 document.querySelector("#refresh").addEventListener("click",refreshStatus);
-async function startRecording(){if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){show("This browser does not support microphone recording. Try a recent version of Chrome or Edge.","error");return}
-try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});chunks=[];mediaRecorder=new MediaRecorder(stream);mediaRecorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
-mediaRecorder.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());record.classList.remove("recording");record.textContent="Start voice input";recording=false;show("Transcribing locally…");const blob=new Blob(chunks,{type:mediaRecorder.mimeType||"audio/webm"});const body=new FormData();body.append("audio",blob,"recording.webm");try{const r=await fetch("/api/voice/transcribe",{method:"POST",body});const d=await r.json();if(!r.ok)throw new Error(d.detail||"Transcription failed.");input.value=d.text;show("Heard: "+d.text);sendCommand(d.text)}catch(e){show(e.message,"error")}};
-mediaRecorder.start();recording=true;record.classList.add("recording");record.textContent="Stop recording";show("Listening… Select Stop recording when you're done.");}
-catch(e){show("Microphone access failed: "+e.message,"error")}}
-record.addEventListener("click",()=>{if(recording)mediaRecorder.stop();else startRecording()});
+function stopRecording(message="Finishing recording…"){if(!recording)return;recording=false;if(meterTimer){clearInterval(meterTimer);meterTimer=null}if(mediaRecorder&&mediaRecorder.state!=="inactive")mediaRecorder.stop();if(message)show(message)}
+async function startRecording(){
+ if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){show("This browser does not support microphone recording. Try a recent version of Chrome or Edge.","error");return}
+ try{
+  const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+  chunks=[];speechDetected=false;lastVoiceAt=0;recordingStartedAt=Date.now();
+  audioContext=new (window.AudioContext||window.webkitAudioContext)();
+  const source=audioContext.createMediaStreamSource(stream);analyser=audioContext.createAnalyser();analyser.fftSize=1024;source.connect(analyser);
+  const samples=new Float32Array(analyser.fftSize);
+  mediaRecorder=new MediaRecorder(stream);
+  mediaRecorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+  mediaRecorder.onstop=async()=>{
+   stream.getTracks().forEach(t=>t.stop());
+   if(audioContext){await audioContext.close().catch(()=>{});audioContext=null}
+   record.classList.remove("recording");record.textContent="Start voice input";
+   show("Transcribing locally…");
+   const blob=new Blob(chunks,{type:mediaRecorder.mimeType||"audio/webm"});
+   if(!speechDetected||blob.size===0){show("I didn't hear speech. Tap the microphone and try again.","error");return}
+   const body=new FormData();body.append("audio",blob,"recording.webm");
+   try{const r=await fetch("/api/voice/transcribe",{method:"POST",body});const d=await r.json();if(!r.ok)throw new Error(d.detail||"Transcription failed.");if(!d.text?.trim())throw new Error("No speech was recognized. Please try again.");input.value=d.text;show("Heard: "+d.text);sendCommand(d.text)}catch(e){show(e.message,"error")}
+  };
+  mediaRecorder.start();recording=true;record.classList.add("recording");record.textContent="Stop now";
+  show("Listening… Speak naturally. Recording stops automatically after 1.4 seconds of silence.");
+  meterTimer=setInterval(()=>{
+   if(!recording||!analyser)return;
+   analyser.getFloatTimeDomainData(samples);
+   let sum=0;for(let i=0;i<samples.length;i++)sum+=samples[i]*samples[i];
+   const rms=Math.sqrt(sum/samples.length),now=Date.now();
+   if(rms>SPEECH_THRESHOLD){speechDetected=true;lastVoiceAt=now}
+   if(speechDetected&&now-lastVoiceAt>=SILENCE_MS){stopRecording("Speech finished. Processing your request…");return}
+   if(!speechDetected&&now-recordingStartedAt>=NO_SPEECH_TIMEOUT_MS){stopRecording("No speech detected. Stopping microphone…");return}
+   if(now-recordingStartedAt>=MAX_RECORDING_MS){stopRecording("Maximum recording time reached. Processing…")}
+  },100);
+ }catch(e){if(meterTimer){clearInterval(meterTimer);meterTimer=null}recording=false;record.classList.remove("recording");record.textContent="Start voice input";show("Microphone access failed: "+e.message,"error")}
+}
+record.addEventListener("click",()=>{if(recording)stopRecording("Stopping microphone…");else startRecording()});
 const screenshotButton=document.querySelector("#screenshot"),preview=document.querySelector("#screen-preview");
 const taskInput=document.querySelector("#task"),makePlan=document.querySelector("#make-plan");
 const approvePlan=document.querySelector("#approve-plan"),planBox=document.querySelector("#plan-box");
