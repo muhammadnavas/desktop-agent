@@ -11,7 +11,9 @@ A local-first Windows desktop assistant with natural-language commands, local Ol
 - The model can only choose from a fixed application allowlist; arbitrary shell commands are never executed.
 - Deterministic parser fallback works when Ollama is unavailable.
 - Read-only Windows awareness: inspect the active window and list visible open windows through registered tools (no UI interaction or shell access).
-- Registered-tool execution: the model can only request explicitly registered actions; tool names, required arguments, extra arguments, and return types are validated, and execution outcomes and failures are logged. Ollama intent JSON is also checked against a strict schema before routing.\n- Persistent local memory: explicitly saved facts and preferences are stored in local MongoDB and supplied as context to the local intent model. Nothing is automatically saved from conversations.\n- Built-in skills: inspectable procedural guidance for app launching, Code Autometa, visible desktop tasks, and voice commands.
+- Registered-tool execution: the model can only request explicitly registered actions; tool names, required arguments, extra arguments, and return types are validated, and execution outcomes and failures are logged. Ollama intent JSON is also checked against a strict schema before routing.
+- Persistent local memory: explicitly saved facts and preferences are stored in local MongoDB and supplied as context to the local intent model. Nothing is automatically saved from conversations.
+- Built-in skills: inspectable procedural guidance for app launching, Code Autometa, visible desktop tasks, and voice commands.
 - Local screenshot capture and screenshot-aware planning through an Ollama vision model.
 - Mouse movement and clicks, safe keyboard navigation, typing, scrolling and bounded waits.
 - Every click/move is shown with its target description and coordinates before approval.
@@ -100,7 +102,11 @@ python -m desktop_agent "Open Notepad"
 
 - `GET /health` — health check
 - `GET /api/apps` — supported application allowlist
-- `GET /api/tools` — registered agent tools and their required arguments (app launch, active-window inspection, open-window listing)\n- `GET /api/skills` and `GET /api/skills/{skill_id}` — discover built-in skills and inspect their instructions\n- `GET /api/memories` — list saved memories; supports `q` and `limit`\n- `POST /api/memories` — explicitly save a memory using JSON `{\"content\":\"...\",\"category\":\"preference\"}`\n- `DELETE /api/memories/{memory_id}` — delete a saved memory
+- `GET /api/tools` — registered agent tools and their required arguments (app launch, active-window inspection, open-window listing)
+- `GET /api/skills` and `GET /api/skills/{skill_id}` — discover built-in skills and inspect their instructions
+- `GET /api/memories` — list saved memories; supports `q` and `limit`
+- `POST /api/memories` — explicitly save a memory using JSON `{\"content\":\"...\",\"category\":\"preference\"}`
+- `DELETE /api/memories/{memory_id}` — delete a saved memory
 - `GET /api/ollama/status` — Ollama and model status
 - `GET /api/diagnostics` — Python platform, Ollama, MongoDB memory connection, optional voice packages, listener state, and desktop dependency diagnostics
 - `POST /api/commands` — JSON: `{"text":"Open Notepad","use_ollama":true}`
@@ -109,7 +115,11 @@ python -m desktop_agent "Open Notepad"
 - `POST /api/tasks/plan` — create a screenshot-aware plan without executing it
 - `POST /api/tasks/confirm` — execute a plan with its one-time approval token
 
-## Agent memory, skills, and tools\n\nMemories are stored in the local MongoDB database `desktop_agent`, collection `memories` by default. Configure the connection with `DESKTOP_AGENT_MONGO_URI`, `DESKTOP_AGENT_MONGO_DATABASE`, and `DESKTOP_AGENT_MONGO_COLLECTION`. Only facts explicitly submitted to `POST /api/memories` are saved; do not store passwords, API keys, authentication codes, or other secrets. The model receives the ten most recent saved facts as context. Built-in skills are guidance documents and do not grant additional execution permissions. Actual actions must still pass through the registered tool allowlist. The window-inspection tools are read-only and return window titles/handles only.\n\n## Safety and current scope
+## Agent memory, skills, and tools
+
+Memories are stored in the local MongoDB database `desktop_agent`, collection `memories` by default. Configure the connection with `DESKTOP_AGENT_MONGO_URI`, `DESKTOP_AGENT_MONGO_DATABASE`, and `DESKTOP_AGENT_MONGO_COLLECTION`. Only facts explicitly submitted to `POST /api/memories` are saved; do not store passwords, API keys, authentication codes, or other secrets. The model receives the ten most recent saved facts as context. Built-in skills are guidance documents and do not grant additional execution permissions. Actual actions must still pass through the registered tool allowlist. The window-inspection tools are read-only and return window titles/handles only.
+
+## Safety and current scope
 
 - The server binds to localhost by default.
 - Only allowlisted apps can be launched.
