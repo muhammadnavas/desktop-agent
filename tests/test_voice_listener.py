@@ -69,3 +69,28 @@ def test_listener_supervisor_retries_after_worker_exit(monkeypatch):
 
     assert len(attempts) == 2
     assert waits == [5.0]
+
+
+def test_listener_supervisor_retries_after_worker_exit(monkeypatch):
+    from desktop_agent.voice_listener import WakeWordListener
+
+    listener = WakeWordListener(lambda _text: None)
+    attempts = []
+
+    def fake_worker():
+        attempts.append("started")
+        if len(attempts) == 2:
+            listener._stop.set()
+
+    monkeypatch.setattr(listener, "_run_once", fake_worker)
+    waits = []
+
+    def fake_wait(delay):
+        waits.append(delay)
+        return False
+
+    monkeypatch.setattr(listener._stop, "wait", fake_wait)
+    listener._run()
+
+    assert len(attempts) == 2
+    assert waits == [5.0]
