@@ -18,7 +18,6 @@ from desktop_agent.ollama_client import OllamaError, ollama_status, plan_desktop
 from desktop_agent.parser import LaunchIntent, parse_command
 from desktop_agent.voice import voice_dependencies_status
 from desktop_agent.voice_listener import WakeWordListener
-from desktop_agent.tool_registry import execute_tool, list_tools
 
 logger = logging.getLogger(__name__)
 
@@ -74,11 +73,6 @@ def home():
 @app.get("/health")
 def health():
     return {"status": "ok", "name": "Desktop Agent", "version": "0.2.0"}
-
-
-@app.get("/api/tools")
-def get_tools():
-    return {"tools": list_tools()}
 
 
 @app.get("/api/apps")
