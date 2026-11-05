@@ -64,11 +64,15 @@ def execute_command(request: CommandRequest):
             if interpreted.get("action") == "launch_app" and interpreted.get("app_id") in allowed_app_ids:
                 intent = LaunchIntent(app_id=interpreted["app_id"])
             else:
-                return {
-                    "success": False,
-                    "message": response_text or "I can't perform that action yet.",
-                    "source": source,
-                }
+                # Prefer a deterministic allowlisted match when the model fails
+                # to recognize a supported app (for example, WhatsApp).
+                intent = parse_command(request.text)
+                if intent is None or intent.app_id not in allowed_app_ids:
+                    return {
+                        "success": False,
+                        "message": response_text or "I can't perform that action yet.",
+                        "source": source,
+                    }
         except OllamaError:
             # Local deterministic parser remains available when Ollama is stopped.
             source = "rules_fallback"
