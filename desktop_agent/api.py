@@ -33,7 +33,7 @@ _last_voice_activity: dict = {"transcript": "", "response": "", "pending_approva
 
 def _voice_approval_intent(transcript: str) -> str | None:
     """Recognize deliberately short approval phrases; never ask Ollama to interpret them."""
-    phrase = re.sub(r"\\s+", " ", re.sub(r"[^a-z0-9\\s]", " ", normalize_spoken_command(transcript))).strip()
+    phrase = re.sub(r"\s+", " ", re.sub(r"[^a-z0-9\s]", " ", normalize_spoken_command(transcript))).strip()
     if phrase in {"yes", "yes approve", "approve", "approved", "confirm", "confirm it", "go ahead", "do it", "proceed"}:
         return "approve"
     if phrase in {"no", "no reject", "reject", "deny", "dont", "do not", "cancel", "cancel it", "stop"}:
