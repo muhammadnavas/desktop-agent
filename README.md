@@ -102,7 +102,7 @@ python -m desktop_agent "Open Notepad"
 - `GET /api/apps` — supported application allowlist
 - `GET /api/tools` — registered agent tools and their required arguments (app launch, active-window inspection, open-window listing)\n- `GET /api/skills` and `GET /api/skills/{skill_id}` — discover built-in skills and inspect their instructions\n- `GET /api/memories` — list saved memories; supports `q` and `limit`\n- `POST /api/memories` — explicitly save a memory using JSON `{\"content\":\"...\",\"category\":\"preference\"}`\n- `DELETE /api/memories/{memory_id}` — delete a saved memory
 - `GET /api/ollama/status` — Ollama and model status
-- `GET /api/diagnostics` — Python platform, Ollama, optional voice packages, listener state, and desktop dependency diagnostics
+- `GET /api/diagnostics` — Python platform, Ollama, MongoDB memory connection, optional voice packages, listener state, and desktop dependency diagnostics
 - `POST /api/commands` — JSON: `{"text":"Open Notepad","use_ollama":true}`
 - `POST /api/voice/transcribe` — multipart upload with field name `audio`
 - `GET /api/desktop/screenshot` — capture the primary display
