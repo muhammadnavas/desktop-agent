@@ -111,6 +111,40 @@ def understand_command(text: str) -> dict:
     return validate_command_intent(result, apps)
 
 
+
+def validate_tool_intent(result: object, tools: list[dict]) -> dict:
+    """Validate an Ollama-selected registered tool and its JSON arguments."""
+    if not isinstance(result, dict):
+        raise OllamaError("Ollama tool intent must be a JSON object.")
+    if set(result) - {"tool", "arguments", "response"}:
+        raise OllamaError("Ollama tool intent contains unexpected fields.")
+
+    tool_name = result.get("tool")
+    arguments = result.get("arguments")
+    response = result.get("response", "")
+    if not isinstance(tool_name, str) or not isinstance(arguments, dict):
+        raise OllamaError("Ollama tool intent must include a tool name and object arguments.")
+    if not isinstance(response, str):
+        raise OllamaError("Ollama tool response must be text.")
+
+    definitions = {item["name"]: item for item in tools}
+    definition = definitions.get(tool_name)
+    if definition is None:
+        raise OllamaError("Ollama requested a tool that is not registered.")
+    required = set(definition.get("required_arguments", []))
+    if set(arguments) != required:
+        raise OllamaError("Ollama tool arguments do not match the registered tool schema.")
+
+    if tool_name == "launch_app":
+        app_ids = {item["id"] for item in supported_apps()}
+        if not isinstance(arguments.get("app_id"), str) or arguments["app_id"] not in app_ids:
+            raise OllamaError("Ollama requested an application outside the approved allowlist.")
+    elif arguments:
+        raise OllamaError("This registered tool does not accept arguments.")
+
+    return {"tool": tool_name, "arguments": arguments, "response": response[:240]}
+
+
 def validate_command_intent(result: object, apps: list[dict[str, str]]) -> dict:
     """Validate model output against the small command schema and app allowlist."""
     if not isinstance(result, dict):
