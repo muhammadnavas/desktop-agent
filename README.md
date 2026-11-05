@@ -147,3 +147,15 @@ pytest -q
 ### Windows UI Automation inspection
 
 Install the optional desktop dependencies with `pip install -e ".[desktop]"`. The registered `get_window_controls` tool inspects a visible window by a case-insensitive title substring and returns accessible control names, types, automation IDs, visibility, and enabled state. It deliberately does not read edit-field values or perform actions. Inspection is read-only and Windows-only; actual interaction remains behind the existing screenshot-plan and explicit-confirmation flow.
+
+
+### Approval-gated UI button clicks
+
+Call `POST /api/ui-actions/plan-click` with `{"window_title":"Notepad","button_name":"Save"}`.
+The agent resolves an exact, unique, visible, enabled Button and returns a
+90-second, single-use confirmation token. Only after explicit user approval,
+call `POST /api/ui-actions/confirm-click` with that token. The target is
+resolved again immediately before clicking, so stale or ambiguous controls
+will not be clicked. Only UIA controls of type `Button` are supported;
+labels associated with sensitive or destructive actions are blocked.
+This API is Windows-only.
