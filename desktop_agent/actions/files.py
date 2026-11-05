@@ -36,7 +36,17 @@ def resolve_file_path(path: str) -> Path:
     expanded = Path(path.strip()).expanduser()
     if not expanded.is_absolute() and not expanded.drive:
         expanded = workspace_root() / expanded
-    return expanded.resolve()
+    resolved = expanded.resolve()
+    sensitive_names = {".env", ".env.local", ".env.production", "id_rsa", "id_ed25519"}
+    if any(
+        part.casefold() in sensitive_names
+        or "credential" in part.casefold()
+        or "secret" in part.casefold()
+        or part.casefold().endswith((".pem", ".key"))
+        for part in resolved.parts
+    ):
+        raise ValueError("Access to secret, credential, and private-key paths is blocked.")
+    return resolved
 
 
 _resolve_workspace_file = resolve_file_path
