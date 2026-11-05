@@ -174,7 +174,7 @@ def test_tools_endpoint_lists_registered_windows_tools():
     assert {
         "launch_app", "get_active_window", "list_open_windows", "get_window_controls",
         "read_file", "prepare_file_write", "close_app", "create_folder",
-        "open_new_tab", "close_current_tab", "get_system_status",
+        "open_new_tab", "close_current_tab", "get_system_status", "list_project_files", "search_project",
     } <= {tool["name"] for tool in response.json()["tools"]}
 
 
@@ -555,3 +555,22 @@ def test_system_status_tool_is_registered_and_read_only():
     assert status["success"] is True
     assert status["python"]
     assert status["logical_cpu_count"] is None or status["logical_cpu_count"] >= 1
+
+
+
+def test_project_file_tools_are_registered():
+    names = {tool["name"] for tool in client.get("/api/tools").json()["tools"]}
+    assert {"list_project_files", "search_project"} <= names
+
+
+def test_project_file_tools_route_through_command_api(monkeypatch, tmp_path):
+    (tmp_path / "main.py").write_text("def hello():\n    return 'world'\n", encoding="utf-8")
+    monkeypatch.setattr(api, "understand_command", lambda _text: {
+        "tool": "search_project",
+        "arguments": {"root": str(tmp_path), "query": "hello"},
+        "response": "Searching the project.",
+    })
+    response = client.post("/api/commands", json={"text": "Find hello in this project"})
+    assert response.status_code == 200
+    assert response.json()["tool"] == "search_project"
+    assert response.json()["result"]["matches"][0]["file"] == "main.py"
