@@ -1,4 +1,4 @@
-"""Optional fully local speech-to-text using faster-whisper."""
+"""Optional local speech input and spoken responses."""
 
 import logging
 import os
@@ -20,6 +20,7 @@ def voice_dependencies_status() -> dict:
         "sounddevice": "sounddevice",
         "numpy": "numpy",
         "onnxruntime": "onnxruntime",
+        "pyttsx3": "pyttsx3",
     }
     installed = {name: find_spec(name) is not None for name in packages}
     missing = [packages[name] for name, available in installed.items() if not available]
@@ -76,3 +77,28 @@ def transcribe_audio(audio_bytes: bytes, suffix: str = ".webm") -> str:
     finally:
         if temp_path and temp_path.exists():
             temp_path.unlink()
+
+
+def speak_text(text: str) -> None:
+    """Speak a concise response locally using Windows SAPI via pyttsx3."""
+    message = " ".join(str(text).split()).strip()
+    if not message:
+        return
+    if len(message) > 450:
+        message = message[:447].rsplit(" ", 1)[0] + "..."
+    try:
+        import pyttsx3
+    except ImportError as exc:
+        raise RuntimeError(
+            "Offline speech output is not installed. Run: pip install -e .[voice]"
+        ) from exc
+
+    engine = pyttsx3.init()
+    try:
+        rate = int(os.getenv("VOICE_RESPONSE_RATE", "175"))
+        engine.setProperty("rate", max(120, min(rate, 220)))
+        engine.setProperty("volume", 1.0)
+        engine.say(message)
+        engine.runAndWait()
+    finally:
+        engine.stop()
