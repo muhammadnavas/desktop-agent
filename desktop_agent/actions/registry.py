@@ -78,12 +78,38 @@ def _launch_app(app_id: str) -> dict[str, Any]:
 
 
 registry = ToolRegistry()
+def _get_active_window() -> dict[str, Any]:
+    from desktop_agent.actions.windows import get_active_window
+
+    return get_active_window()
+
+
+def _list_open_windows(limit: int = 30) -> dict[str, Any]:
+    from desktop_agent.actions.windows import list_open_windows
+
+    return list_open_windows(limit)
+
+
 registry.register(
     ToolDefinition(
         name="launch_app",
         description="Launch one application from the approved Windows application allowlist.",
         handler=_launch_app,
         required_arguments=("app_id",),
+    )
+)
+registry.register(
+    ToolDefinition(
+        name="get_active_window",
+        description="Read the title and handle of the currently focused top-level window.",
+        handler=_get_active_window,
+    )
+)
+registry.register(
+    ToolDefinition(
+        name="list_open_windows",
+        description="List visible top-level Windows windows and their titles; accepts optional limit from 1 to 50.",
+        handler=_list_open_windows,
     )
 )
 
