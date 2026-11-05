@@ -616,3 +616,31 @@ def test_diagnostic_command_rejects_non_allowlisted_command(monkeypatch):
 def test_diagnostic_command_tool_is_registered():
     names = {tool["name"] for tool in client.get("/api/tools").json()["tools"]}
     assert "run_diagnostic_command" in names
+
+
+def test_diagnostic_command_routes_with_ollama(monkeypatch):
+    monkeypatch.setattr(api, "understand_command", lambda _text: {
+        "tool": "run_diagnostic_command",
+        "arguments": {"command_id": "ipconfig"},
+        "response": "Running network diagnostics.",
+    })
+    monkeypatch.setattr(api, "execute_tool", lambda name, args: {
+        "success": True, "command_id": args["command_id"], "output": "IPv4 Address"
+    })
+    response = client.post("/api/commands", json={"text": "Show my IP configuration"})
+    assert response.status_code == 200
+    assert response.json()["tool"] == "run_diagnostic_command"
+    assert "IPv4 Address" in response.json()["message"]
+
+
+def test_diagnostic_command_has_rules_fallback(monkeypatch):
+    calls = []
+    monkeypatch.setattr(api, "understand_command", lambda _text: (_ for _ in ()).throw(api.OllamaError("offline")))
+    monkeypatch.setattr(api, "execute_tool", lambda name, args: calls.append((name, args)) or {
+        "success": True, "command_id": "ipconfig", "output": "Windows IP Configuration"
+    })
+    response = client.post("/api/commands", json={
+        "text": "Run ipconfig", "use_ollama": False
+    })
+    assert response.status_code == 200
+    assert calls == [("run_diagnostic_command", {"command_id": "ipconfig"})]
