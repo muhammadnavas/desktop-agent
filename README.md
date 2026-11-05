@@ -5,6 +5,7 @@ A local-first Windows desktop assistant with natural-language commands, local Ol
 ## Features
 
 - Text commands to launch Notepad, Calculator, File Explorer, or VS Code.
+- Say **“Alexa, code autometa”** to open the AI Browser Automation Agent workspace in Antigravity and start frontend/backend development servers in separate terminal windows.
 - Always-on local Alexa wake-word detection with openWakeWord; after activation, one command is captured and transcribed locally with faster-whisper.
 - Local Ollama model interprets natural-language intent. No hosted LLM API key is needed.
 - The model can only choose from a fixed application allowlist; arbitrary shell commands are never executed.
@@ -71,14 +72,17 @@ uvicorn desktop_agent.api:app --host 127.0.0.1 --port 8765
 
 Open http://127.0.0.1:8765.
 
-## Voice commands
+## Hands-free voice commands
 
-1. Allow microphone access in Chrome or Edge.
-2. Click **Start voice input**, speak, then click **Stop recording**.
-3. Audio is sent to the local backend and transcribed with faster-whisper.
-4. The transcript is passed to Ollama for intent understanding and execution.
+1. Install the voice extras with `pip install -e ".[voice,desktop]"`.
+2. Start the Desktop Agent API. Its backend listens locally for the **Alexa** wake word.
+3. Say **“Alexa”**, then speak a command. Recording stops after a short silence and faster-whisper transcribes it locally.
+4. Say **“Alexa, code autometa”** to run the fixed development workflow for the AI Browser Automation Agent:
+   - Open the project in Antigravity (or use the `agy` CLI if the IDE launcher is not found).
+   - Open a terminal in `frontend` and run `npm run dev`.
+   - Open another terminal in `backend` and run `uvicorn main:app --reload`.
 
-The first Whisper run downloads the selected model. Audio transcription is local; no browser cloud speech recognition is used.
+The default project path is `D:\\Projects\\Python\\ai-browser-automation-agent`. To change it, set `AI_BROWSER_AGENT_ROOT` before starting Desktop Agent. The workflow validates `frontend/package.json` and `backend/main.py` before launching anything. The microphone stays active while the API is running; wake-word detection and transcription run locally.
 
 ## CLI
 
