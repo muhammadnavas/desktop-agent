@@ -1,44 +1,35 @@
-"""Small local SQLite memory store for explicit, user-approved facts."""
+"""Local MongoDB memory store for explicit, user-approved facts."""
 
 from __future__ import annotations
 
 import os
-import sqlite3
-from contextlib import contextmanager
+import re
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
-DEFAULT_DB = Path(__file__).resolve().parent.parent / "data" / "agent_memory.sqlite3"
-DB_PATH = Path(os.getenv("DESKTOP_AGENT_MEMORY_DB", str(DEFAULT_DB)))
+from bson import ObjectId
+from pymongo import MongoClient
+from pymongo.collection import Collection
+from pymongo.errors import PyMongoError
+
+MONGO_URI = os.getenv("DESKTOP_AGENT_MONGO_URI", "mongodb://127.0.0.1:27017")
+MONGO_DATABASE = os.getenv("DESKTOP_AGENT_MONGO_DATABASE", "desktop_agent")
+MONGO_COLLECTION = os.getenv("DESKTOP_AGENT_MONGO_COLLECTION", "memories")
+_SERVER_SELECTION_TIMEOUT_MS = 2000
 
 
-def _connect() -> sqlite3.Connection:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(DB_PATH, timeout=5)
-    connection.row_factory = sqlite3.Row
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS memories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            content TEXT NOT NULL,
-            category TEXT NOT NULL DEFAULT 'general',
-            created_at TEXT NOT NULL
-        )
-        """
-    )
-    return connection
-
-
-
-@contextmanager
-def _connection():
-    connection = _connect()
+def _collection() -> Collection:
+    """Connect to the local MongoDB service and return the memories collection."""
     try:
-        with connection:
-            yield connection
-    finally:
-        connection.close()
+        client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=_SERVER_SELECTION_TIMEOUT_MS)
+        client.admin.command("ping")
+        collection = client[MONGO_DATABASE][MONGO_COLLECTION]
+        collection.create_index("created_at")
+        return collection
+    except PyMongoError as exc:
+        raise RuntimeError(
+            f"Cannot connect to MongoDB at {MONGO_URI}. Start the local MongoDB service and try again."
+        ) from exc
 
 
 def remember(content: str, category: str = "general") -> dict[str, Any]:
@@ -50,40 +41,49 @@ def remember(content: str, category: str = "general") -> dict[str, Any]:
         raise ValueError("Memory content must be 1000 characters or fewer.")
     if len(category) > 40:
         raise ValueError("Memory category must be 40 characters or fewer.")
+
     created_at = datetime.now(timezone.utc).isoformat()
-    with _connection() as connection:
-        cursor = connection.execute(
-            "INSERT INTO memories(content, category, created_at) VALUES (?, ?, ?)",
-            (content, category, created_at),
-        )
-        memory_id = cursor.lastrowid
-    return {"id": memory_id, "content": content, "category": category, "created_at": created_at}
+    document = {"content": content, "category": category, "created_at": created_at}
+    try:
+        result = _collection().insert_one(document)
+    except PyMongoError as exc:
+        raise RuntimeError(f"Could not save memory to MongoDB: {exc}") from exc
+    return {"id": str(result.inserted_id), **document}
 
 
 def list_memories(query: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
     limit = max(1, min(int(limit), 100))
-    with _connection() as connection:
-        if query and query.strip():
-            rows = connection.execute(
-                "SELECT id, content, category, created_at FROM memories "
-                "WHERE content LIKE ? OR category LIKE ? ORDER BY id DESC LIMIT ?",
-                (f"%{query.strip()}%", f"%{query.strip()}%", limit),
-            ).fetchall()
-        else:
-            rows = connection.execute(
-                "SELECT id, content, category, created_at FROM memories ORDER BY id DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
-    return [dict(row) for row in rows]
+    filters: dict[str, Any] = {}
+    if query and query.strip():
+        pattern = re.escape(query.strip())
+        filters["$or"] = [
+            {"content": {"$regex": pattern, "$options": "i"}},
+            {"category": {"$regex": pattern, "$options": "i"}},
+        ]
+    try:
+        documents = _collection().find(filters).sort("created_at", -1).limit(limit)
+        return [
+            {"id": str(item["_id"]), "content": item["content"],
+             "category": item["category"], "created_at": item["created_at"]}
+            for item in documents
+        ]
+    except PyMongoError as exc:
+        raise RuntimeError(f"Could not read memories from MongoDB: {exc}") from exc
 
 
-def delete_memory(memory_id: int) -> bool:
-    with _connection() as connection:
-        cursor = connection.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
-        return cursor.rowcount > 0
+def delete_memory(memory_id: str) -> bool:
+    if not ObjectId.is_valid(memory_id):
+        return False
+    try:
+        result = _collection().delete_one({"_id": ObjectId(memory_id)})
+        return result.deleted_count > 0
+    except PyMongoError as exc:
+        raise RuntimeError(f"Could not delete memory from MongoDB: {exc}") from exc
 
 
 def memory_context(limit: int = 10) -> str:
     """Return concise user-approved facts for prompt context."""
     items = list_memories(limit=limit)
-    return "\n".join(f"- [{item['category']}] {item['content']}" for item in reversed(items))
+    return "\n".join(
+        f"- [{item['category']}] {item['content']}" for item in reversed(items)
+    )
