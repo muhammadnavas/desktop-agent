@@ -84,6 +84,11 @@ def _create_folder(path: str) -> dict[str, Any]:
     return create_folder(path)
 
 
+def _list_directory(path: str, limit: int = 100) -> dict[str, Any]:
+    from desktop_agent.actions.files import list_directory
+    return list_directory(path, limit)
+
+
 def _list_project_files(root: str, limit: int = 100) -> dict[str, Any]:
     from desktop_agent.actions.files import list_project_files
     return list_project_files(root, limit)
@@ -251,5 +256,15 @@ registry.register(
         description="Search literal text in bounded UTF-8 source files within a project.",
         handler=_search_project,
         required_arguments=("root", "query"),
+    )
+)
+
+
+registry.register(
+    ToolDefinition(
+        name="list_directory",
+        description="List files and subfolders in a directory with sensitive credential files filtered out.",
+        handler=_list_directory,
+        required_arguments=("path",),
     )
 )
