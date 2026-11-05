@@ -171,9 +171,11 @@ def test_voice_status_is_actionable_when_listener_has_not_started():
 def test_tools_endpoint_lists_registered_windows_tools():
     response = client.get("/api/tools")
     assert response.status_code == 200
-    assert {tool["name"] for tool in response.json()["tools"]} == {
-        "launch_app", "get_active_window", "list_open_windows", "get_window_controls", "read_file", "prepare_file_write"
-    }
+    assert {
+        "launch_app", "get_active_window", "list_open_windows", "get_window_controls",
+        "read_file", "prepare_file_write", "close_app", "create_folder",
+        "open_new_tab", "close_current_tab", "get_system_status",
+    } <= {tool["name"] for tool in response.json()["tools"]}
 
 
 def test_memory_api_create_list_delete(monkeypatch):
@@ -511,3 +513,45 @@ def test_safe_folder_creation_executes_without_approval(monkeypatch, tmp_path):
     assert response.json()["tool"] == "create_folder"
     assert "needs_approval" not in response.json()
     assert (tmp_path / "documents" / "projects").is_dir()
+
+
+
+def test_browser_tab_close_requires_approval_and_is_single_use(monkeypatch):
+    from desktop_agent.actions import browser_tabs
+
+    calls = []
+    monkeypatch.setattr(browser_tabs, "close_current_tab",
+        lambda: calls.append("closed") or {"success": True, "window": "Google Chrome"})
+    monkeypatch.setattr(api, "understand_command", lambda _text: {
+        "tool": "close_current_tab", "arguments": {}, "response": "Closing the current tab."
+    })
+    planned = client.post("/api/commands", json={"text": "Close this browser tab"})
+    assert planned.status_code == 200
+    payload = planned.json()
+    assert payload["needs_approval"] is True
+    assert calls == []
+
+    approved = client.post("/api/commands/confirm",
+        json={"confirmation_token": payload["confirmation_token"]})
+    assert approved.status_code == 200
+    assert approved.json()["tool"] == "close_current_tab"
+    assert calls == ["closed"]
+
+    replay = client.post("/api/commands/confirm",
+        json={"confirmation_token": payload["confirmation_token"]})
+    assert replay.status_code == 404
+
+
+def test_command_approval_endpoint_rejects_unknown_token():
+    response = client.post("/api/commands/confirm",
+        json={"confirmation_token": "x" * 40})
+    assert response.status_code == 404
+
+
+def test_system_status_tool_is_registered_and_read_only():
+    from desktop_agent.actions.system import get_system_status
+
+    status = get_system_status()
+    assert status["success"] is True
+    assert status["python"]
+    assert status["logical_cpu_count"] is None or status["logical_cpu_count"] >= 1
