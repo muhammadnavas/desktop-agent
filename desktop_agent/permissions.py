@@ -12,6 +12,7 @@ SAFE_TOOLS = frozenset({
     "get_window_controls",
     "open_new_tab",
     "get_system_status",
+    "run_diagnostic_command",
 })
 APPROVAL_TOOLS = frozenset({"close_app", "close_current_tab", "create_folder", "prepare_file_write"})
 
