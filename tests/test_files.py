@@ -81,3 +81,10 @@ def test_expired_write_token_cannot_write(monkeypatch, tmp_path):
     with pytest.raises(TimeoutError):
         files.confirm_file_write(staged["confirmation_token"])
     assert not (tmp_path / "expired.txt").exists()
+
+
+@pytest.mark.parametrize("path", [".env", ".env.local", "secrets/api.txt", "credentials.json", "private.pem", "id_rsa"])
+def test_file_tools_block_secret_and_credential_paths(monkeypatch, tmp_path, path):
+    monkeypatch.setenv("DESKTOP_AGENT_WORKSPACE", str(tmp_path))
+    with pytest.raises(ValueError, match="secret"):
+        files.prepare_file_write(path, "sensitive")
