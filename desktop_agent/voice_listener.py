@@ -72,9 +72,13 @@ class WakeWordListener:
     def _run(self) -> None:
         try:
             import sounddevice as sd
+            import openwakeword
             from openwakeword.model import Model
             from desktop_agent.voice import transcribe_audio
 
+            # The pip package does not bundle pretrained wake-word weights.
+            # Download them once into openWakeWord's model cache before loading.
+            openwakeword.utils.download_models()
             model = Model(wakeword_models=["alexa"], inference_framework="onnx")
             audio_queue: queue.Queue[np.ndarray] = queue.Queue(maxsize=80)
 
