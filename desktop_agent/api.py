@@ -1,5 +1,6 @@
 """Local API for the Desktop Agent."""
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 import secrets
 import time
@@ -13,11 +14,35 @@ from desktop_agent.actions.desktop import capture_screenshot, execute_steps, val
 from desktop_agent.ollama_client import OllamaError, ollama_status, plan_desktop_task, understand_command
 from desktop_agent.parser import LaunchIntent, parse_command
 from desktop_agent.voice import transcribe_audio
+from desktop_agent.voice_listener import WakeWordListener
+
+_wake_listener: WakeWordListener | None = None
+
+
+def _handle_wake_command(transcript: str) -> None:
+    try:
+        execute_command(CommandRequest(text=transcript, use_ollama=True))
+    except Exception:
+        # Listener remains alive even if one command cannot be handled.
+        pass
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    global _wake_listener
+    _wake_listener = WakeWordListener(_handle_wake_command)
+    _wake_listener.start()
+    try:
+        yield
+    finally:
+        _wake_listener.stop()
+
 
 app = FastAPI(
     title="Desktop Agent",
     version="0.2.0",
     description="Local-first Windows desktop assistant with Ollama and offline voice input.",
+    lifespan=lifespan,
 )
 INDEX_FILE = Path(__file__).parent / "web" / "index.html"
 _PENDING_TASKS: dict[str, dict] = {}
@@ -47,6 +72,13 @@ def get_apps():
 @app.get("/api/ollama/status")
 def get_ollama_status():
     return ollama_status()
+
+
+@app.get("/api/voice/status")
+def get_voice_status():
+    if _wake_listener is None:
+        return {"available": False, "state": "starting", "wake_word": "Alexa"}
+    return _wake_listener.status()
 
 
 @app.post("/api/commands")
