@@ -176,16 +176,19 @@ def test_tools_endpoint_lists_registered_windows_tools():
     }
 
 
-def test_memory_api_create_list_delete(monkeypatch, tmp_path):
+def test_memory_api_create_list_delete(monkeypatch):
+    import mongomock
     from desktop_agent import memory
 
-    monkeypatch.setattr(memory, "DB_PATH", tmp_path / "api-memory.sqlite3")
+    client = mongomock.MongoClient()
+    monkeypatch.setattr(memory, "_client", client)
     created = client.post(
         "/api/memories",
         json={"content": "Preferred project model is Qwen", "category": "preference"},
     )
     assert created.status_code == 200
     memory_id = created.json()["memory"]["id"]
+    assert isinstance(memory_id, str)
 
     listed = client.get("/api/memories?q=Qwen")
     assert listed.status_code == 200
