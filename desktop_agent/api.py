@@ -31,23 +31,55 @@ _wake_listener: WakeWordListener | None = None
 _last_voice_activity: dict = {"transcript": "", "response": "", "pending_approval": None}
 
 
+def _voice_approval_intent(transcript: str) -> str | None:
+    """Recognize deliberately short approval phrases; never ask Ollama to interpret them."""
+    phrase = normalize_spoken_command(transcript).strip(" .!?")
+    if phrase in {"yes", "yes approve", "approve", "approved", "confirm", "confirm it", "go ahead", "do it", "proceed"}:
+        return "approve"
+    if phrase in {"no", "no reject", "reject", "deny", "dont", "do not", "cancel", "cancel it", "stop"}:
+        return "reject"
+    return None
+
+
+def _handle_voice_approval(transcript: str, intent: str) -> str:
+    """Approve/reject only the exact still-pending action created by voice."""
+    pending = _last_voice_activity.get("pending_approval")
+    if not pending or not pending.get("token"):
+        return "There isn't a pending voice approval."
+    token = pending["token"]
+    request = CommandConfirmRequest(confirmation_token=token)
+    if intent == "approve":
+        result = confirm_command(request)
+        response = result.get("message") or "Approved action completed."
+    else:
+        result = cancel_command(request)
+        response = "Rejected. No changes were made."
+    _last_voice_activity["pending_approval"] = None
+    return response
+
+
 def _handle_wake_command(transcript: str) -> None:
-    """Execute a spoken command and speak its actual outcome."""
+    """Execute a spoken command or resolve an explicitly pending voice approval."""
     logger.info("VOICE COMMAND RECEIVED | transcript=%r", transcript)
+    intent = _voice_approval_intent(transcript)
     try:
-        result = execute_command(CommandRequest(text=transcript, use_ollama=True, session_id="voice"))
-        response = result.get("message") or "Command completed."
-        _last_voice_activity.update({
-            "transcript": transcript,
-            "response": response,
-            "pending_approval": {
-                "token": result.get("confirmation_token"),
-                "tool": result.get("tool"),
-                "message": response,
-                "expires_in_seconds": result.get("expires_in_seconds", 90),
-            } if result.get("needs_approval") and result.get("confirmation_token") else None,
-        })
-        logger.info("AGENT RESPONSE | success=%s source=%s tool=%s response=%s", result.get("success"), result.get("source"), result.get("tool", "workflow"), response)
+        if intent:
+            response = _handle_voice_approval(transcript, intent)
+            _last_voice_activity.update({"transcript": transcript, "response": response})
+        else:
+            result = execute_command(CommandRequest(text=transcript, use_ollama=True, session_id="voice"))
+            response = result.get("message") or "Command completed."
+            _last_voice_activity.update({
+                "transcript": transcript,
+                "response": response,
+                "pending_approval": {
+                    "token": result.get("confirmation_token"),
+                    "tool": result.get("tool"),
+                    "message": response,
+                    "expires_in_seconds": result.get("expires_in_seconds", 90),
+                } if result.get("needs_approval") and result.get("confirmation_token") else None,
+            })
+            logger.info("AGENT RESPONSE | success=%s source=%s tool=%s response=%s", result.get("success"), result.get("source"), result.get("tool", "workflow"), response)
     except HTTPException as exc:
         detail = exc.detail
         response = detail if isinstance(detail, str) else "I couldn't complete that command."
@@ -62,7 +94,6 @@ def _handle_wake_command(transcript: str) -> None:
     try:
         speak_text(response)
     except Exception:
-        # Speech output is optional and must never stop the wake-word listener.
         logger.exception("Could not speak the voice command response")
 
 
