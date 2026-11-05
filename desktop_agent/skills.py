@@ -21,6 +21,12 @@ SKILLS = {
         "instructions": "For read-only awareness, use get_active_window or list_open_windows. To inspect a window's accessible controls, use get_window_controls with its title; it returns names and types only, never field values. For a button click by accessible name, resolve an exact unique visible enabled Button, show the window and button names, then require the one-time confirmation endpoint. Never click ambiguous controls. For other interactions, use a fresh screenshot, create a bounded plan, show every step, and require explicit approval. Never enter passwords, perform payments, delete data, or change security settings.",
         "examples": ["Click the visible Settings button", "Scroll down this page"],
     },
+    "file_management": {
+        "name": "Read and write workspace files",
+        "description": "Read UTF-8 text files and stage new or edited files inside the configured workspace.",
+        "instructions": "Use read_file for reading UTF-8 text files inside DESKTOP_AGENT_WORKSPACE. Use prepare_file_write to create or edit a file; it only stages the change and returns a preview and one-time confirmation token. Show the target path, whether an existing file will be overwritten, and the preview. Never claim a write is complete until the user explicitly confirms through POST /api/files/confirm-write. Paths must be relative to the workspace. Never access paths outside it, secrets, credentials, browser profiles, or system files. Do not use shell commands for file operations.",
+        "examples": ["Read README.md", "Create notes/todo.txt with these tasks", "Update config/settings.json"],
+    },
     "voice_command": {
         "name": "Handle voice commands",
         "description": "Convert a spoken command into the same validated command flow used for typed requests.",
