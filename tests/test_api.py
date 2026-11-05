@@ -174,7 +174,7 @@ def test_tools_endpoint_lists_registered_windows_tools():
     assert {
         "launch_app", "get_active_window", "list_open_windows", "get_window_controls",
         "read_file", "prepare_file_write", "close_app", "create_folder",
-        "open_new_tab", "close_current_tab", "get_system_status", "list_project_files", "search_project",
+        "open_new_tab", "close_current_tab", "get_system_status", "list_project_files", "search_project", "list_directory",
     } <= {tool["name"] for tool in response.json()["tools"]}
 
 
@@ -591,3 +591,15 @@ def test_project_file_tools_route_through_command_api(monkeypatch, tmp_path):
     assert response.status_code == 200
     assert response.json()["tool"] == "search_project"
     assert response.json()["result"]["matches"][0]["file"] == "main.py"
+
+
+def test_list_directory_tool_lists_entries_and_filters_secret_names(tmp_path):
+    from desktop_agent.actions.files import list_directory
+
+    (tmp_path / "notes.txt").write_text("hello", encoding="utf-8")
+    (tmp_path / "secret.txt").write_text("do not list", encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    result = list_directory(str(tmp_path))
+    names = {item["name"] for item in result["entries"]}
+    assert {"notes.txt", "docs"} <= names
+    assert "secret.txt" not in names
