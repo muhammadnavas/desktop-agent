@@ -11,7 +11,7 @@ A local-first Windows desktop assistant with natural-language commands, local Ol
 - The model can only choose from a fixed application allowlist; arbitrary shell commands are never executed.
 - Deterministic parser fallback works when Ollama is unavailable.
 - Read-only Windows awareness: inspect the active window and list visible open windows through registered tools (no UI interaction or shell access).
-- Registered-tool execution: the model can only request explicitly registered actions; tool names, required arguments, extra arguments, and return types are validated, and execution outcomes and failures are logged. Ollama intent JSON is also checked against a strict schema before routing.\n- Persistent local memory: explicitly saved facts and preferences are stored in SQLite and supplied as context to the local intent model. Nothing is automatically saved from conversations.\n- Built-in skills: inspectable procedural guidance for app launching, Code Autometa, visible desktop tasks, and voice commands.
+- Registered-tool execution: the model can only request explicitly registered actions; tool names, required arguments, extra arguments, and return types are validated, and execution outcomes and failures are logged. Ollama intent JSON is also checked against a strict schema before routing.\n- Persistent local memory: explicitly saved facts and preferences are stored in local MongoDB and supplied as context to the local intent model. Nothing is automatically saved from conversations.\n- Built-in skills: inspectable procedural guidance for app launching, Code Autometa, visible desktop tasks, and voice commands.
 - Local screenshot capture and screenshot-aware planning through an Ollama vision model.
 - Mouse movement and clicks, safe keyboard navigation, typing, scrolling and bounded waits.
 - Every click/move is shown with its target description and coordinates before approval.
@@ -40,6 +40,10 @@ For always-on Alexa wake-word detection and offline voice transcription, install
 ```powershell
 pip install -e ".[voice,desktop]"
 ```
+
+## Configure local MongoDB
+
+Install MongoDB Community Server for Windows and start the MongoDB service. The default connection is `mongodb://127.0.0.1:27017`; Desktop Agent creates the `desktop_agent` database and `memories` collection automatically when first used. You can override `DESKTOP_AGENT_MONGO_URI`, `DESKTOP_AGENT_MONGO_DATABASE`, and `DESKTOP_AGENT_MONGO_COLLECTION` in your `.env` file. Copy `.env.example` to `.env` and adjust only if needed. If MongoDB is unavailable, memory API requests return HTTP 503; normal app commands continue without memory context.
 
 ## Configure Ollama
 
@@ -105,7 +109,7 @@ python -m desktop_agent "Open Notepad"
 - `POST /api/tasks/plan` — create a screenshot-aware plan without executing it
 - `POST /api/tasks/confirm` — execute a plan with its one-time approval token
 
-## Agent memory, skills, and tools\n\nMemories are stored locally in `data/agent_memory.sqlite3` by default. Set `DESKTOP_AGENT_MEMORY_DB` to choose another database path. Only facts explicitly submitted to `POST /api/memories` are saved; do not store passwords, API keys, authentication codes, or other secrets. The model receives the ten most recent saved facts as context. Built-in skills are guidance documents and do not grant additional execution permissions. Actual actions must still pass through the registered tool allowlist. The window-inspection tools are read-only and return window titles/handles only.\n\n## Safety and current scope
+## Agent memory, skills, and tools\n\nMemories are stored in the local MongoDB database `desktop_agent`, collection `memories` by default. Configure the connection with `DESKTOP_AGENT_MONGO_URI`, `DESKTOP_AGENT_MONGO_DATABASE`, and `DESKTOP_AGENT_MONGO_COLLECTION`. Only facts explicitly submitted to `POST /api/memories` are saved; do not store passwords, API keys, authentication codes, or other secrets. The model receives the ten most recent saved facts as context. Built-in skills are guidance documents and do not grant additional execution permissions. Actual actions must still pass through the registered tool allowlist. The window-inspection tools are read-only and return window titles/handles only.\n\n## Safety and current scope
 
 - The server binds to localhost by default.
 - Only allowlisted apps can be launched.
