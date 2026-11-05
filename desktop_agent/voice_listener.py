@@ -61,7 +61,7 @@ def should_finish_capture(
     """Pure capture policy, separated from microphone I/O for unit testing."""
     if not speech_seen and elapsed >= speech_start_timeout:
         return True, "no_speech"
-    if speech_seen and speech_duration >= min_speech_seconds and silence_elapsed >= silence_seconds:
+    if speech_seen and silence_elapsed >= silence_seconds:
         return True, "speech_complete"
     if elapsed >= max_command_seconds:
         return True, "max_duration"
