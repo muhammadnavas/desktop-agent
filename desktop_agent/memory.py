@@ -34,7 +34,7 @@ def _collection() -> Collection:
         return collection
     except PyMongoError as exc:
         raise RuntimeError(
-            f"Cannot connect to MongoDB at {MONGO_URI}. Start the local MongoDB service and try again."
+            "Cannot connect to the configured MongoDB server. Start the local MongoDB service and check DESKTOP_AGENT_MONGO_URI."
         ) from exc
 
 
