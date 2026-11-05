@@ -211,3 +211,38 @@ def test_skills_api_lists_and_reads_builtin_skill():
 
 def test_unknown_skill_returns_404():
     assert client.get("/api/skills/not-a-real-skill").status_code == 404
+
+
+def test_command_routes_to_active_window_tool(monkeypatch):
+    monkeypatch.setattr(
+        api,
+        "understand_command",
+        lambda _text: {"tool": "get_active_window", "arguments": {}, "response": "Checking active window."},
+    )
+    monkeypatch.setattr(
+        api,
+        "execute_tool",
+        lambda name, arguments: {"available": True, "title": "VS Code", "handle": 123}
+        if name == "get_active_window" and arguments == {} else {},
+    )
+
+    response = client.post("/api/commands", json={"text": "What window is active?"})
+
+    assert response.status_code == 200
+    assert response.json()["tool"] == "get_active_window"
+    assert response.json()["result"]["title"] == "VS Code"
+
+
+def test_command_uses_rule_fallback_for_open_windows(monkeypatch):
+    monkeypatch.setattr(api, "understand_command", lambda _text: (_ for _ in ()).throw(api.OllamaError("offline")))
+    monkeypatch.setattr(
+        api,
+        "execute_tool",
+        lambda name, arguments: {"windows": [{"title": "Notepad"}], "count": 1, "limit": 30},
+    )
+
+    response = client.post("/api/commands", json={"text": "List all open windows"})
+
+    assert response.status_code == 200
+    assert response.json()["tool"] == "list_open_windows"
+    assert response.json()["result"]["count"] == 1
