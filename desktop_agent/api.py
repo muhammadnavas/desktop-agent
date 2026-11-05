@@ -293,6 +293,18 @@ def execute_command(request: CommandRequest):
             tool_name = "close_current_tab"
         elif any(term in normalized for term in ("system status", "system information", "system specs", "cpu information", "disk space")):
             tool_name = "get_system_status"
+        elif any(verb in normalized for verb in ("run ", "show ", "check ", "list ")):
+            diagnostic_aliases = {
+                "ipconfig": "ipconfig", "tasklist": "tasklist", "whoami": "whoami",
+                "systeminfo": "systeminfo", "system info": "systeminfo",
+                "python version": "python_version", "node version": "node_version",
+                "git version": "git_version", "docker version": "docker_version",
+            }
+            for phrase, command_id in diagnostic_aliases.items():
+                if phrase in normalized:
+                    tool_name = "run_diagnostic_command"
+                    tool_arguments = {"command_id": command_id}
+                    break
 
     clarification_question = interpreted.get("clarification_question", "") if request.use_ollama and source == "ollama" else ""
     if clarification_question:
