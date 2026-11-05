@@ -85,3 +85,30 @@ def test_inspection_validates_limit(monkeypatch, limit):
     monkeypatch.setattr(windows_uia.os, "name", "nt")
     with pytest.raises(ValueError):
         windows_uia.get_window_controls("Notepad", limit=limit)
+
+
+def test_click_button_uses_resolved_control(monkeypatch):
+    clicked = []
+    fake_window = types.SimpleNamespace(window_text=lambda: "Notepad")
+    fake_button = types.SimpleNamespace(
+        element_info=types.SimpleNamespace(name="Save"),
+        click_input=lambda: clicked.append("clicked"),
+    )
+    monkeypatch.setattr(windows_uia, "_find_button", lambda *_args: (fake_window, fake_button))
+    result = windows_uia.click_button("Notepad", "Save")
+    assert clicked == ["clicked"]
+    assert result["success"] is True
+    assert result["button_name"] == "Save"
+
+
+def test_inspect_button_target_does_not_click(monkeypatch):
+    clicked = []
+    fake_window = types.SimpleNamespace(window_text=lambda: "Notepad")
+    fake_button = types.SimpleNamespace(
+        element_info=types.SimpleNamespace(name="Save"),
+        click_input=lambda: clicked.append("clicked"),
+    )
+    monkeypatch.setattr(windows_uia, "_find_button", lambda *_args: (fake_window, fake_button))
+    result = windows_uia.inspect_button_target("Notepad", "Save")
+    assert result["control_type"] == "Button"
+    assert clicked == []
