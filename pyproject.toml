@@ -17,7 +17,7 @@ dependencies = [
 [project.optional-dependencies]
 # faster-whisper 1.2.1 calls av.open(metadata_errors=...), removed in PyAV 19.
 # Keep PyAV below 19 until the released faster-whisper package supports it.
-voice = ["faster-whisper>=1.1,<2.0", "av>=11,<19"]
+voice = ["faster-whisper>=1.1,<2.0", "av>=11,<19", "openwakeword>=0.6,<0.7", "sounddevice>=0.4.6,<1.0", "numpy>=1.26,<3", "onnxruntime>=1.17,<2"]
 desktop = ["pyautogui>=0.9.54,<1.0"]
 dev = ["pytest>=8.0,<9.0", "httpx>=0.27,<1.0"]
 
