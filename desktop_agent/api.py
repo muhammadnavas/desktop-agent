@@ -66,6 +66,25 @@ def _handle_wake_command(transcript: str) -> None:
         if intent:
             response = _handle_voice_approval(transcript, intent)
             _last_voice_activity.update({"transcript": transcript, "response": response})
+        elif _last_voice_activity.get("pending_approval"):
+            pending = _last_voice_activity["pending_approval"]
+            token = pending.get("token")
+            stored = _PENDING_COMMAND_APPROVALS.get(token) if token else None
+            if stored and time.monotonic() - stored["created_at"] <= 90:
+                response = (
+                    "There is already an action waiting for approval. "
+                    "Say Alexa, yes to approve it or Alexa, no to reject it."
+                )
+                _last_voice_activity.update({"transcript": transcript, "response": response})
+            else:
+                if token:
+                    _PENDING_COMMAND_APPROVALS.pop(token, None)
+                _last_voice_activity.update({
+                    "transcript": transcript,
+                    "response": "That approval has expired. Please repeat your command.",
+                    "pending_approval": None,
+                })
+                response = _last_voice_activity["response"]
         else:
             result = execute_command(CommandRequest(text=transcript, use_ollama=True, session_id="voice"))
             response = result.get("message") or "Command completed."
