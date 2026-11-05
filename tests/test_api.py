@@ -114,3 +114,25 @@ def test_task_plan_requires_approval_and_is_single_use(monkeypatch):
         json={"confirmation_token": payload["confirmation_token"]},
     )
     assert replay.status_code == 404
+
+
+def test_code_autometa_starts_fixed_workflow_without_ollama(monkeypatch):
+    monkeypatch.setattr(
+        api,
+        "start_code_autometa_workflow",
+        lambda: {
+            "message": "Workflow started",
+            "workflow": "code_autometa",
+        },
+    )
+
+    def should_not_call_ollama(_text):
+        raise AssertionError("The explicit workflow phrase must bypass Ollama")
+
+    monkeypatch.setattr(api, "understand_command", should_not_call_ollama)
+    response = client.post("/api/commands", json={"text": "code autometa"})
+
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+    assert response.json()["source"] == "workflow"
+    assert response.json()["result"]["workflow"] == "code_autometa"
