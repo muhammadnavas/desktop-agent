@@ -5,7 +5,7 @@ A local-first Windows desktop assistant with natural-language commands, local Ol
 ## Features
 
 - Text commands to launch Notepad, Calculator, File Explorer, or VS Code.
-- Voice input recorded in the browser and transcribed locally with faster-whisper.
+- Always-on local Alexa wake-word detection with openWakeWord; after activation, one command is captured and transcribed locally with faster-whisper.
 - Local Ollama model interprets natural-language intent. No hosted LLM API key is needed.
 - The model can only choose from a fixed application allowlist; arbitrary shell commands are never executed.
 - Deterministic parser fallback works when Ollama is unavailable.
@@ -19,7 +19,7 @@ A local-first Windows desktop assistant with natural-language commands, local Ol
 - Windows 10/11
 - Python 3.10+
 - [Ollama](https://ollama.com/download) (recommended)
-- Chrome or Edge for microphone recording
+- A working Windows microphone input device
 
 ## Install
 
@@ -32,7 +32,7 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-For offline voice transcription, install the optional dependency:
+For always-on Alexa wake-word detection and offline voice transcription, install the voice extras:
 
 ```powershell
 pip install -e ".[voice,desktop]"
