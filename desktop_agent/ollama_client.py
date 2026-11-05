@@ -151,6 +151,18 @@ def validate_tool_intent(result: object, tools: list[dict]) -> dict:
         title = arguments.get("window_title")
         if not isinstance(title, str) or not title.strip() or len(title) > 200:
             raise OllamaError("Window title must be non-empty text of at most 200 characters.")
+    elif tool_name in {"read_file", "prepare_file_write"}:
+        path = arguments.get("path")
+        if not isinstance(path, str) or not path.strip() or len(path) > 500:
+            raise OllamaError("File path must be non-empty relative path text.")
+        from pathlib import PurePath
+        candidate = PurePath(path)
+        if candidate.is_absolute() or candidate.drive or ".." in candidate.parts:
+            raise OllamaError("File tools only accept relative paths inside the configured workspace.")
+        if tool_name == "prepare_file_write":
+            content = arguments.get("content")
+            if not isinstance(content, str) or len(content.encode("utf-8")) > 1_000_000:
+                raise OllamaError("File content must be text no larger than 1 MB.")
     elif arguments:
         raise OllamaError("This registered tool does not accept arguments.")
 
