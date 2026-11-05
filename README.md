@@ -4,7 +4,9 @@ A local-first Windows desktop assistant with natural-language commands, local Ol
 
 ## Features
 
-- Text commands to launch Notepad, Calculator, File Explorer, or VS Code.
+- Text and voice commands to launch Notepad, Calculator, File Explorer, VS Code, or WhatsApp.
+- Guarded browser tab controls: open a new tab in a supported focused browser; closing the current tab requires explicit approval.
+- Read-only system status for OS, hostname, Python, CPU count, and disk usage.
 - Say **“Alexa, code autometa”** to open the AI Browser Automation Agent workspace in Antigravity and start frontend/backend development servers in separate terminal windows.
 - Always-on local Alexa wake-word detection with openWakeWord; after activation, one command is captured and transcribed locally with faster-whisper.
 - Spoken offline feedback after voice commands using Windows SAPI via pyttsx3, including successful actions, unsupported commands, and errors.
@@ -136,7 +138,7 @@ python -m desktop_agent "Open Notepad"
 
 - `GET /health` — health check
 - `GET /api/apps` — supported application allowlist
-- `GET /api/tools` — registered agent tools and their required arguments (app launch, active-window inspection, open-window listing)
+- `GET /api/tools` — registered agent tools and their required arguments (apps, browser tabs, system status, files, and window inspection)
 - `GET /api/skills` and `GET /api/skills/{skill_id}` — discover built-in skills and inspect their instructions
 - `GET /api/memories` — list saved memories; supports `q` and `limit`
 - `POST /api/memories` — explicitly save a memory using JSON `{\"content\":\"...\",\"category\":\"preference\"}`
@@ -157,7 +159,7 @@ The local intent model receives a built-in, non-sensitive user profile from `des
 
 ## Agent memory, skills, and tools
 
-Memories are stored in the local MongoDB database `desktop_agent`, collection `memories` by default. Configure the connection with `DESKTOP_AGENT_MONGO_URI`, `DESKTOP_AGENT_MONGO_DATABASE`, and `DESKTOP_AGENT_MONGO_COLLECTION`. Only facts explicitly submitted to `POST /api/memories` are saved; do not store passwords, API keys, authentication codes, or other secrets. The model receives the ten most recent saved facts as context. Built-in skills are guidance documents and do not grant additional execution permissions. Actual actions must still pass through the registered tool allowlist. The window-inspection tools are read-only and return window titles/handles only. Natural-language requests such as “What window is active?” and “List open windows” are routed to those tools by Ollama; deterministic phrase matching is used if Ollama is unavailable.
+Memories are stored in the local MongoDB database `desktop_agent`, collection `memories` by default. Configure the connection with `DESKTOP_AGENT_MONGO_URI`, `DESKTOP_AGENT_MONGO_DATABASE`, and `DESKTOP_AGENT_MONGO_COLLECTION`. Only facts explicitly submitted to `POST /api/memories` are saved; do not store passwords, API keys, authentication codes, or other secrets. The model receives the ten most recent saved facts as context. Built-in skills are guidance documents and do not grant additional execution permissions. Actual actions must still pass through the registered tool allowlist. The window-inspection tools are read-only and return window titles/handles only. Natural-language requests such as “What window is active?”, “List open windows”, “Open a new tab”, “Close this tab”, and “What are my system specs?” are routed to registered tools. Browser-tab shortcuts only run when a supported browser is the foreground window. Closing a tab and closing an application require a one-time approval through `/api/commands/confirm`. System status is read-only.
 
 ## Safety and current scope
 
