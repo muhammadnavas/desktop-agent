@@ -16,3 +16,9 @@ def test_matches_wake_word_with_project_suffix():
 def test_does_not_match_unrelated_or_extra_commands():
     assert not is_code_autometa_command("Alexa, open Notepad")
     assert not is_code_autometa_command("Code Autometa and delete all files")
+
+
+def test_matches_common_autometa_speech_variants():
+    assert is_code_autometa_command("Alexa, Code Automate")
+    assert is_code_autometa_command("Hey Alexa, Code Auto Meta")
+    assert is_code_autometa_command("Please launch Code Autometa")
