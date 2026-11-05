@@ -164,6 +164,10 @@ def validate_tool_intent(result: object, tools: list[dict]) -> dict:
         app_ids = {item["id"] for item in supported_apps()}
         if not isinstance(arguments.get("app_id"), str) or arguments["app_id"] not in app_ids:
             raise OllamaError("Ollama requested an application outside the approved allowlist.")
+    elif tool_name == "run_diagnostic_command":
+        allowed_commands = {"ipconfig", "tasklist", "whoami", "systeminfo", "python_version", "node_version", "git_version", "docker_version"}
+        if arguments.get("command_id") not in allowed_commands:
+            raise OllamaError("Diagnostic command is not in the fixed read-only allowlist.")
     elif tool_name == "get_window_controls":
         title = arguments.get("window_title")
         if not isinstance(title, str) or not title.strip() or len(title) > 200:
