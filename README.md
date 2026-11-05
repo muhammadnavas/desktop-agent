@@ -98,7 +98,7 @@ python -m desktop_agent "Open Notepad"
 ## Tests
 
 ```powershell
-pip install -e ".[dev]"
+pip install -e ".[dev,desktop,voice]"
 pytest -q
 ```
 
