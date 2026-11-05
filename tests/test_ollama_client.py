@@ -69,6 +69,7 @@ TOOLS = [
     {"name": "launch_app", "required_arguments": ["app_id"]},
     {"name": "get_active_window", "required_arguments": []},
     {"name": "list_open_windows", "required_arguments": []},
+    {"name": "get_window_controls", "required_arguments": ["window_title"]},
 ]
 
 
@@ -134,3 +135,23 @@ def test_unsupported_tool_intent_is_normalized():
         TOOLS,
     )
     assert result == {"tool": None, "arguments": {}, "response": "Not supported"}
+
+
+def test_window_controls_tool_accepts_valid_title():
+    from desktop_agent.ollama_client import validate_tool_intent
+
+    result = validate_tool_intent(
+        {"tool": "get_window_controls", "arguments": {"window_title": "Notepad"}, "response": "Inspecting"},
+        TOOLS,
+    )
+    assert result["tool"] == "get_window_controls"
+
+
+def test_window_controls_tool_rejects_invalid_title():
+    from desktop_agent.ollama_client import validate_tool_intent
+
+    with pytest.raises(OllamaError, match="Window title"):
+        validate_tool_intent(
+            {"tool": "get_window_controls", "arguments": {"window_title": " "}, "response": "Inspecting"},
+            TOOLS,
+        )
