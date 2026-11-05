@@ -133,7 +133,7 @@ class WakeWordListener:
             wav_file.writeframes(audio.tobytes())
         return output.getvalue()
 
-    def _run(self) -> None:
+    def _run_once(self) -> None:
         try:
             import sounddevice as sd
             import openwakeword
@@ -263,3 +263,30 @@ class WakeWordListener:
         except Exception as exc:
             logger.exception("Alexa wake-word listener could not start")
             self._set_state("unavailable", str(exc))
+
+
+    def _run(self) -> None:
+        """Supervise the microphone worker and recover after device/model failures."""
+        retry_delay = _setting("VOICE_RESTART_DELAY", 5.0, 2.0)
+        max_retry_delay = 60.0
+        while not self._stop.is_set():
+            worker = threading.Thread(
+                target=self._run_once,
+                name="desktop-agent-audio-worker",
+                daemon=True,
+            )
+            worker.start()
+            while worker.is_alive() and not self._stop.is_set():
+                worker.join(timeout=0.5)
+            if self._stop.is_set():
+                break
+            with self._state_lock:
+                previous_error = self._last_error or "Voice listener stopped unexpectedly."
+            logger.warning(
+                "Alexa listener stopped; retrying microphone/model initialization in %.1f seconds",
+                retry_delay,
+            )
+            self._set_state("restarting", previous_error)
+            if self._stop.wait(retry_delay):
+                break
+            retry_delay = min(retry_delay * 2, max_retry_delay)
