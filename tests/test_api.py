@@ -172,7 +172,7 @@ def test_tools_endpoint_lists_registered_windows_tools():
     response = client.get("/api/tools")
     assert response.status_code == 200
     assert {tool["name"] for tool in response.json()["tools"]} == {
-        "launch_app", "get_active_window", "list_open_windows", "get_window_controls"
+        "launch_app", "get_active_window", "list_open_windows", "get_window_controls", "read_file", "prepare_file_write"
     }
 
 
