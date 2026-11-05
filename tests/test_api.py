@@ -315,3 +315,32 @@ def test_file_management_skill_is_available():
     response = client.get("/api/skills/file_management")
     assert response.status_code == 200
     assert "prepare_file_write" in response.json()["instructions"]
+
+
+def test_natural_language_file_read_routes_to_registered_tool(monkeypatch, tmp_path):
+    from desktop_agent.actions import files as file_actions
+
+    monkeypatch.setenv("DESKTOP_AGENT_WORKSPACE", str(tmp_path))
+    (tmp_path / "README.md").write_text("project notes", encoding="utf-8")
+    monkeypatch.setattr(api, "understand_command", lambda _text: {
+        "tool": "read_file", "arguments": {"path": "README.md"}, "response": "Reading it."
+    })
+    response = client.post("/api/commands", json={"text": "Read README.md"})
+    assert response.status_code == 200
+    assert response.json()["tool"] == "read_file"
+    assert response.json()["result"]["content"] == "project notes"
+
+
+def test_natural_language_file_write_only_stages_change(monkeypatch, tmp_path):
+    monkeypatch.setenv("DESKTOP_AGENT_WORKSPACE", str(tmp_path))
+    monkeypatch.setattr(api, "understand_command", lambda _text: {
+        "tool": "prepare_file_write",
+        "arguments": {"path": "notes.txt", "content": "new content"},
+        "response": "The file has been created.",
+    })
+    response = client.post("/api/commands", json={"text": "Create notes.txt"})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["tool"] == "prepare_file_write"
+    assert "Nothing has been written yet" in payload["message"]
+    assert not (tmp_path / "notes.txt").exists()
