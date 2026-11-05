@@ -43,3 +43,29 @@ def test_capture_has_hard_maximum_duration():
         True,
         "max_duration",
     )
+
+
+def test_listener_supervisor_retries_after_worker_exit(monkeypatch):
+    import threading
+    from desktop_agent.voice_listener import WakeWordListener
+
+    listener = WakeWordListener(lambda _text: None)
+    attempts = []
+
+    def fake_worker():
+        attempts.append("started")
+        if len(attempts) == 2:
+            listener._stop.set()
+
+    monkeypatch.setattr(listener, "_run_once", fake_worker)
+    waits = []
+
+    def fake_wait(_delay):
+        waits.append(_delay)
+        return False
+
+    monkeypatch.setattr(listener._stop, "wait", fake_wait)
+    listener._run()
+
+    assert len(attempts) == 2
+    assert waits == [5.0]
