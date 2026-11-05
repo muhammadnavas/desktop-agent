@@ -1,4 +1,4 @@
-"""Guarded desktop interaction primitives. All coordinates are screen-relative."""
+"""Guarded desktop interaction primitives. Coordinates are screen-relative."""
 
 import base64
 import io
@@ -7,17 +7,22 @@ import time
 from typing import Any
 
 
-_ALLOWED_KEYS = {
-    "enter", "tab", "esc", "space", "backspace", "delete", "up", "down",
-    "left", "right", "home", "end", "pageup", "pagedown",
-    "ctrl", "shift", "alt", "win", "a", "c", "v", "x", "z", "y",
+_ALLOWED_SINGLE_KEYS = {
+    "enter", "tab", "esc", "space", "backspace", "up", "down", "left",
+    "right", "home", "end", "pageup", "pagedown",
 }
-_BLOCKED_COMBINATIONS = {
-    frozenset(("ctrl", "alt", "delete")),
-    frozenset(("ctrl", "shift", "esc")),
-    frozenset(("win", "r")),
-    frozenset(("win", "x")),
+_ALLOWED_COMBINATIONS = {
+    ("ctrl", "l"),       # Focus browser address bar.
+    ("ctrl", "a"),       # Select current field/document.
+    ("alt", "left"),     # Browser back.
+    ("alt", "right"),    # Browser forward.
+    ("shift", "tab"),    # Previous form control.
 }
+_BLOCKED_TEXT_TERMS = (
+    "password", "passcode", "one-time code", "otp", "credit card",
+    "bank account", "secret key", "delete", "erase", "format drive",
+    "payment", "purchase", "checkout",
+)
 
 
 def capture_screenshot() -> dict[str, Any]:
@@ -51,25 +56,42 @@ def validate_steps(steps: Any) -> list[dict[str, Any]]:
         if not isinstance(step, dict):
             raise ValueError(f"Step {index + 1} is invalid.")
         action = step.get("action")
-        if action == "click":
+        if action in {"click", "move"}:
             x, y = step.get("x"), step.get("y")
             if type(x) is not int or type(y) is not int or not (0 <= x < 100000 and 0 <= y < 100000):
-                raise ValueError(f"Step {index + 1} has invalid click coordinates.")
-            validated.append({"action": "click", "x": x, "y": y, "button": "left"})
+                raise ValueError(f"Step {index + 1} has invalid pointer coordinates.")
+            target = step.get("target", "visible screen location")
+            if not isinstance(target, str) or not target.strip() or len(target) > 100:
+                raise ValueError(f"Step {index + 1} has an invalid target description.")
+            if action == "move":
+                duration = step.get("duration", 0.2)
+                if type(duration) not in (int, float) or not 0 <= duration <= 2:
+                    raise ValueError(f"Step {index + 1} has invalid movement duration.")
+                validated.append({
+                    "action": "move", "x": x, "y": y,
+                    "target": target.strip(), "duration": float(duration),
+                })
+            else:
+                validated.append({
+                    "action": "click", "x": x, "y": y,
+                    "target": target.strip(), "button": "left",
+                })
         elif action == "type":
             value = step.get("text")
             if not isinstance(value, str) or not value or len(value) > 2000:
                 raise ValueError(f"Step {index + 1} has invalid text.")
-            sensitive_terms = ("password", "passcode", "one-time code", "otp", "credit card", "bank account", "secret key")
-            if any(term in value.lower() for term in sensitive_terms):
-                raise ValueError(f"Step {index + 1} appears to contain sensitive information and is blocked.")
+            if any(term in value.lower() for term in _BLOCKED_TEXT_TERMS):
+                raise ValueError(f"Step {index + 1} contains sensitive or destructive text and is blocked.")
             validated.append({"action": "type", "text": value})
         elif action == "press":
             keys = step.get("keys")
-            if not isinstance(keys, list) or not 1 <= len(keys) <= 3:
+            if not isinstance(keys, list) or not 1 <= len(keys) <= 2:
                 raise ValueError(f"Step {index + 1} has invalid keys.")
             normalized = tuple(str(key).lower() for key in keys)
-            if any(key not in _ALLOWED_KEYS for key in normalized) or frozenset(normalized) in _BLOCKED_COMBINATIONS:
+            if len(normalized) == 1:
+                if normalized[0] not in _ALLOWED_SINGLE_KEYS:
+                    raise ValueError(f"Step {index + 1} contains a blocked or unsupported key.")
+            elif normalized not in _ALLOWED_COMBINATIONS:
                 raise ValueError(f"Step {index + 1} contains a blocked or unsupported key combination.")
             validated.append({"action": "press", "keys": list(normalized)})
         elif action == "scroll":
@@ -101,14 +123,20 @@ def execute_steps(steps: list[dict[str, Any]], screen_width: int, screen_height:
     results = []
     for index, step in enumerate(steps):
         action = step["action"]
-        if action == "click":
+        if action in {"click", "move"}:
             if step["x"] >= screen_width or step["y"] >= screen_height:
-                raise ValueError(f"Step {index + 1} clicks outside the captured screen.")
-            pyautogui.click(step["x"], step["y"], button="left")
+                raise ValueError(f"Step {index + 1} points outside the captured screen.")
+            if action == "move":
+                pyautogui.moveTo(step["x"], step["y"], duration=step["duration"])
+            else:
+                pyautogui.click(step["x"], step["y"], button="left")
         elif action == "type":
             pyautogui.write(step["text"], interval=0.01)
         elif action == "press":
-            pyautogui.hotkey(*step["keys"])
+            if len(step["keys"]) == 1:
+                pyautogui.press(step["keys"][0])
+            else:
+                pyautogui.hotkey(*step["keys"])
         elif action == "scroll":
             pyautogui.scroll(step["amount"])
         elif action == "wait":
