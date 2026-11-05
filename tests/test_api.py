@@ -166,3 +166,9 @@ def test_voice_status_is_actionable_when_listener_has_not_started():
         assert response.json()["available"] is False
     finally:
         api._wake_listener = monkeypatch_listener
+
+
+def test_tools_endpoint_lists_only_registered_tools():
+    response = client.get("/api/tools")
+    assert response.status_code == 200
+    assert [tool["name"] for tool in response.json()["tools"]] == ["launch_app"]
