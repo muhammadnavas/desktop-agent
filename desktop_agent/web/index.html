@@ -16,7 +16,7 @@ input{flex:1;min-width:0;padding:15px 14px;border:1px solid #34445e;border-radiu
 input:focus{border-color:#6b9eea}button{border:0;border-radius:11px;padding:0 18px;color:#07111f;background:#9fc3ff;font-weight:700;cursor:pointer}
 button:disabled{opacity:.55;cursor:wait}.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
 .secondary{background:#1c2a40;color:#c9d8ee;border:1px solid #34445e;padding:10px 13px}.mic{background:#263b5b;color:#dceaff;padding:10px 14px}
-.mic.recording{background:#783d4a;color:#fff}.examples{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}
+.mic.recording{background:#783d4a;color:#fff}.voice-indicator{display:inline-flex;align-items:center;gap:8px;padding:10px 13px;border:1px solid #34445e;border-radius:11px;background:#0d1727;color:#a9c8ff;font-size:13px}.voice-dot{width:8px;height:8px;border-radius:50%;background:#d69a54;box-shadow:0 0 0 3px #d69a5422}.voice-indicator.active .voice-dot{background:#69d5a0;box-shadow:0 0 0 3px #69d5a022}.examples{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}
 .chip{padding:8px 11px;border:1px solid #34445e;border-radius:999px;color:#c3d1e7;background:transparent;font-size:12px}
 .status{border:1px solid #263247;border-radius:12px;padding:14px;color:#b7c5d9;font-size:13px;min-height:48px;line-height:1.5}
 .status.ok{border-color:#27634d;color:#9de0bf}.status.error{border-color:#75414a;color:#ffb4bd}
@@ -34,9 +34,9 @@ textarea{width:100%;min-height:96px;resize:vertical;padding:13px 14px;border:1px
 <body><main>
 <header><div class="brand"><div class="logo">D</div><div><h1>Desktop Agent</h1><div class="muted">Local AI · Voice · Windows control</div></div></div><div id="ollama-pill" class="pill">Checking Ollama…</div></header>
 <form id="command-form"><label for="command">Tell your computer what to do</label><div class="entry"><input id="command" maxlength="1000" autocomplete="off" placeholder="Open Notepad and start writing…" required><button id="run" type="submit">Run command</button></div></form>
-<div class="actions"><button id="record" class="mic" type="button">Start voice input</button><button id="refresh" class="secondary" type="button">Refresh Ollama status</button></div>
+<div class="actions"><span id="voice-state" class="voice-indicator"><span class="voice-dot"></span><span>Starting Alexa wake-word detection…</span></span><button id="refresh" class="secondary" type="button">Refresh Ollama status</button></div>
 <div class="examples"><button class="chip" type="button" data-command="Open Notepad">Open Notepad</button><button class="chip" type="button" data-command="Launch Calculator">Calculator</button><button class="chip" type="button" data-command="Open File Explorer">File Explorer</button><button class="chip" type="button" data-command="Start VS Code">VS Code</button><button class="chip" type="button" data-command="Open WhatsApp">WhatsApp</button></div>
-<div id="status" class="status" role="status" aria-live="polite">Ready. Type a command or use the microphone.</div>
+<div id="status" class="status" role="status" aria-live="polite">Ready. Say “Alexa” followed by a command, or type below.</div>
 <div class="meta"><span id="engine">Intent engine: checking…</span><span>Localhost only</span></div>
 <section class="desktop-panel">
 <h2>Desktop eyes & hands</h2>
@@ -50,57 +50,30 @@ textarea{width:100%;min-height:96px;resize:vertical;padding:13px 14px;border:1px
 <p class="danger-note">Every plan requires confirmation and expires after 2 minutes. Emergency stop: move your mouse to the top-left screen corner to trigger PyAutoGUI's failsafe.</p>
 </section>
 <hr>
-<div class="muted">Voice is transcribed locally with faster-whisper. Intent understanding uses your local Ollama model. If Ollama is unavailable, supported launch commands fall back to deterministic parsing.</div>
-<div class="foot">Safety: the model can only select from the approved application list. It cannot run arbitrary shell commands. Microphone access requires browser permission.</div>
+<div class="muted">The microphone listens locally for the “Alexa” wake word. After activation, Desktop Agent records your command, stops after silence, and transcribes it locally with faster-whisper.</div>
+<div class="foot">Safety: the model can only select from the approved application list. It cannot run arbitrary shell commands. Wake-word detection runs on your computer. Audio is not uploaded for wake-word detection; only the command recorded after activation is passed to local transcription.</div>
 </main>
 <script>
 const form=document.querySelector("#command-form"),input=document.querySelector("#command"),statusBox=document.querySelector("#status");
 const run=document.querySelector("#run"),record=document.querySelector("#record"),pill=document.querySelector("#ollama-pill"),engine=document.querySelector("#engine");
-let mediaRecorder=null,chunks=[],recording=false,audioContext=null,analyser=null,meterTimer=null;
-let speechDetected=false,lastVoiceAt=0,recordingStartedAt=0;
-const SILENCE_MS=1400, SPEECH_THRESHOLD=0.018, NO_SPEECH_TIMEOUT_MS=8000, MAX_RECORDING_MS=20000;
 function show(message,kind=""){statusBox.className="status "+kind;statusBox.textContent=message}
 async function refreshStatus(){try{const r=await fetch("/api/ollama/status"),d=await r.json();if(d.connected&&d.model_available){pill.textContent="Ollama · "+d.configured_model;pill.className="pill ok";engine.textContent="Intent engine: local Ollama"}else if(d.connected){pill.textContent="Model not pulled";pill.className="pill";engine.textContent="Intent engine: rules fallback"}else{pill.textContent="Ollama offline";pill.className="pill";engine.textContent="Intent engine: rules fallback"}}catch{pill.textContent="Backend offline";engine.textContent="Intent engine: unavailable"}}
 async function sendCommand(text){show("Understanding your request…");run.disabled=true;try{const r=await fetch("/api/commands",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text,use_ollama:true})});const d=await r.json();if(!r.ok)throw new Error(d.detail||"Command failed.");show(d.message+(d.source?" · "+d.source:""),d.success?"ok":"");}catch(e){show(e.message,"error")}finally{run.disabled=false}}
 form.addEventListener("submit",e=>{e.preventDefault();if(input.value.trim())sendCommand(input.value.trim())});
 document.querySelectorAll("[data-command]").forEach(b=>b.addEventListener("click",()=>{input.value=b.dataset.command;sendCommand(input.value)}));
 document.querySelector("#refresh").addEventListener("click",refreshStatus);
-function stopRecording(message="Finishing recording…"){if(!recording)return;recording=false;if(meterTimer){clearInterval(meterTimer);meterTimer=null}if(mediaRecorder&&mediaRecorder.state!=="inactive")mediaRecorder.stop();if(message)show(message)}
-async function startRecording(){
- if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){show("This browser does not support microphone recording. Try a recent version of Chrome or Edge.","error");return}
+const voiceState=document.querySelector("#voice-state");
+async function refreshVoiceStatus(){
  try{
-  const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
-  chunks=[];speechDetected=false;lastVoiceAt=0;recordingStartedAt=Date.now();
-  audioContext=new (window.AudioContext||window.webkitAudioContext)();
-  const source=audioContext.createMediaStreamSource(stream);analyser=audioContext.createAnalyser();analyser.fftSize=1024;source.connect(analyser);
-  const samples=new Float32Array(analyser.fftSize);
-  mediaRecorder=new MediaRecorder(stream);
-  mediaRecorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
-  mediaRecorder.onstop=async()=>{
-   stream.getTracks().forEach(t=>t.stop());
-   if(audioContext){await audioContext.close().catch(()=>{});audioContext=null}
-   record.classList.remove("recording");record.textContent="Start voice input";
-   show("Transcribing locally…");
-   const blob=new Blob(chunks,{type:mediaRecorder.mimeType||"audio/webm"});
-   if(!speechDetected||blob.size===0){show("I didn't hear speech. Tap the microphone and try again.","error");return}
-   const body=new FormData();body.append("audio",blob,"recording.webm");
-   try{const r=await fetch("/api/voice/transcribe",{method:"POST",body});const d=await r.json();if(!r.ok)throw new Error(d.detail||"Transcription failed.");if(!d.text?.trim())throw new Error("No speech was recognized. Please try again.");input.value=d.text;show("Heard: "+d.text);sendCommand(d.text)}catch(e){show(e.message,"error")}
-  };
-  mediaRecorder.start();recording=true;record.classList.add("recording");record.textContent="Stop now";
-  show("Listening… Speak naturally. Recording stops automatically after 1.4 seconds of silence.");
-  meterTimer=setInterval(()=>{
-   if(!recording||!analyser)return;
-   analyser.getFloatTimeDomainData(samples);
-   let sum=0;for(let i=0;i<samples.length;i++)sum+=samples[i]*samples[i];
-   const rms=Math.sqrt(sum/samples.length),now=Date.now();
-   if(rms>SPEECH_THRESHOLD){speechDetected=true;lastVoiceAt=now}
-   if(speechDetected&&now-lastVoiceAt>=SILENCE_MS){stopRecording("Speech finished. Processing your request…");return}
-   if(!speechDetected&&now-recordingStartedAt>=NO_SPEECH_TIMEOUT_MS){stopRecording("No speech detected. Stopping microphone…");return}
-   if(now-recordingStartedAt>=MAX_RECORDING_MS){stopRecording("Maximum recording time reached. Processing…")}
-  },100);
- }catch(e){if(meterTimer){clearInterval(meterTimer);meterTimer=null}recording=false;record.classList.remove("recording");record.textContent="Start voice input";show("Microphone access failed: "+e.message,"error")}
+  const r=await fetch("/api/voice/status"),d=await r.json();
+  const labels={starting:"Starting wake-word engine…",listening:"Listening for “Alexa”",command_listening:"Alexa detected · Listening for command",processing:"Processing your command…",unavailable:"Wake-word listener unavailable",error:"Wake-word listener error"};
+  voiceState.querySelector("span:last-child").textContent=labels[d.state]||"Voice listener status unknown";
+  voiceState.classList.toggle("active",d.state==="listening"||d.state==="command_listening");
+  if(d.last_error&&d.state==="unavailable")voiceState.title=d.last_error;
+  if(d.state==="processing"&&d.last_transcript)show("Heard: "+d.last_transcript);
+ }catch{voiceState.querySelector("span:last-child").textContent="Voice listener status unavailable";voiceState.classList.remove("active")}
 }
-record.addEventListener("click",()=>{if(recording)stopRecording("Stopping microphone…");else startRecording()});
+refreshStatus();refreshVoiceStatus();setInterval(refreshVoiceStatus,1000);
 const screenshotButton=document.querySelector("#screenshot"),preview=document.querySelector("#screen-preview");
 const taskInput=document.querySelector("#task"),makePlan=document.querySelector("#make-plan");
 const approvePlan=document.querySelector("#approve-plan"),planBox=document.querySelector("#plan-box");
