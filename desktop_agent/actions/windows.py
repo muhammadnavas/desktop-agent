@@ -41,7 +41,8 @@ def list_open_windows(limit: int = 30) -> dict[str, Any]:
         raise ValueError("limit must be an integer between 1 and 50.")
 
     user32 = _user32()
-    user32.EnumWindows.argtypes = [wintypes.WNDENUMPROC, wintypes.LPARAM]
+    callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    user32.EnumWindows.argtypes = [callback_type, wintypes.LPARAM]
     user32.EnumWindows.restype = wintypes.BOOL
     user32.IsWindowVisible.argtypes = [wintypes.HWND]
     user32.IsWindowVisible.restype = wintypes.BOOL
@@ -52,7 +53,7 @@ def list_open_windows(limit: int = 30) -> dict[str, Any]:
 
     windows: list[dict[str, Any]] = []
 
-    @wintypes.WNDENUMPROC
+    @callback_type
     def callback(hwnd, _lparam):
         if len(windows) >= limit:
             return False
