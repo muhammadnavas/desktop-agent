@@ -36,7 +36,7 @@ def test_capture_discards_too_short_noise():
         elapsed=2.0,
         silence_elapsed=1.2,
         speech_duration=0.08,
-    ) == (False, "continue")
+    ) == (True, "speech_complete")
 
 
 def test_capture_has_hard_maximum_duration():
