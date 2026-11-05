@@ -61,10 +61,14 @@ def is_code_autometa_command(text: str) -> bool:
         for size in (1, 2, 3)
         if len(tail) >= size
     ]
-    targets = ("code autometa", "autometa")
+    targets = ("codeautometa", "autometa")
+    compact_candidates = [candidate.replace(" ", "") for candidate in candidates]
+    # Known Whisper mishearing observed during this user's live tests.
+    if any(candidate.endswith("goodpottermeta") for candidate in compact_candidates):
+        return True
     return any(
-        SequenceMatcher(None, candidate.replace(" ", ""), target.replace(" ", "")).ratio() >= 0.76
-        for candidate in candidates
+        SequenceMatcher(None, candidate, target).ratio() >= 0.68
+        for candidate in compact_candidates
         for target in targets
     )
 
