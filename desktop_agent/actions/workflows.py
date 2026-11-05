@@ -95,6 +95,45 @@ def _registered_antigravity_path() -> Path | None:
     return None
 
 
+def _uninstall_registry_paths() -> list[Path]:
+    """Find Antigravity install locations registered by Windows installers."""
+    if os.name != "nt":
+        return []
+    try:
+        import winreg
+    except ImportError:
+        return []
+    locations: list[Path] = []
+    uninstall_key = r"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
+    for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+        for view in (getattr(winreg, "KEY_WOW64_64KEY", 0), getattr(winreg, "KEY_WOW64_32KEY", 0)):
+            try:
+                with winreg.OpenKey(hive, uninstall_key, 0, winreg.KEY_READ | view) as root_key:
+                    count = winreg.QueryInfoKey(root_key)[0]
+                    for index in range(count):
+                        try:
+                            sub_name = winreg.EnumKey(root_key, index)
+                            with winreg.OpenKey(root_key, sub_name) as item:
+                                display, _ = winreg.QueryValueEx(item, "DisplayName")
+                                if "antigravity" not in str(display).casefold():
+                                    continue
+                                for value_name in ("InstallLocation", "DisplayIcon"):
+                                    try:
+                                        value, _ = winreg.QueryValueEx(item, value_name)
+                                        candidate = Path(str(value).strip().strip('"').split(",")[0])
+                                        if candidate.is_file() and candidate.name.casefold() == "antigravity.exe":
+                                            locations.append(candidate)
+                                        elif candidate.is_dir():
+                                            locations.extend((candidate / "Antigravity.exe", candidate / "Application" / "Antigravity.exe"))
+                                    except OSError:
+                                        continue
+                        except OSError:
+                            continue
+            except OSError:
+                continue
+    return locations
+
+
 def _find_antigravity_exe() -> Path | None:
     """Find the IDE using explicit override, PATH, registry, and common install paths."""
     override = os.environ.get("ANTIGRAVITY_EXE")
@@ -111,6 +150,9 @@ def _find_antigravity_exe() -> Path | None:
     registered = _registered_antigravity_path()
     if registered:
         return registered
+    for candidate in _uninstall_registry_paths():
+        if candidate.is_file():
+            return candidate
 
     roots = [
         Path(os.environ.get("LOCALAPPDATA", "")),
@@ -124,6 +166,7 @@ def _find_antigravity_exe() -> Path | None:
         candidates.extend(
             [
                 base / "Programs" / "Antigravity" / "Antigravity.exe",
+                base / "Programs" / "Antigravity" / "Application" / "Antigravity.exe",
                 base / "Antigravity" / "Antigravity.exe",
                 base / "Google" / "Antigravity" / "Antigravity.exe",
                 base / "Google" / "Antigravity" / "Application" / "Antigravity.exe",
