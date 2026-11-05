@@ -16,7 +16,7 @@ def test_apps_endpoint_returns_allowlist():
     response = client.get("/api/apps")
     assert response.status_code == 200
     assert {app["id"] for app in response.json()["apps"]} == {
-        "notepad", "calculator", "explorer", "vscode"
+        "notepad", "calculator", "explorer", "vscode", "whatsapp"
     }
 
 
@@ -33,6 +33,18 @@ def test_command_uses_rules_when_ollama_is_unavailable(monkeypatch):
     assert response.json()["success"] is True
     assert response.json()["source"] == "rules_fallback"
     assert response.json()["result"]["app"] == "notepad"
+
+
+def test_command_opens_whatsapp_with_rules_fallback(monkeypatch):
+    def unavailable(_text):
+        raise api.OllamaError("offline")
+
+    monkeypatch.setattr(api, "understand_command", unavailable)
+    monkeypatch.setattr(api, "launch_app", lambda app_id: {"status": "launched", "app": app_id})
+    response = client.post("/api/commands", json={"text": "Open WhatsApp"})
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+    assert response.json()["result"]["app"] == "whatsapp"
 
 
 def test_command_rejects_unsupported_rule_command(monkeypatch):
