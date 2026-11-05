@@ -15,7 +15,7 @@ from desktop_agent.actions.registry import available_tools, execute_tool
 from desktop_agent.actions.desktop import capture_screenshot, execute_steps, validate_steps
 from desktop_agent.actions.workflows import is_code_autometa_command, start_code_autometa_workflow
 from desktop_agent.ollama_client import OllamaError, ollama_status, plan_desktop_task, understand_command
-from desktop_agent.parser import LaunchIntent, parse_command
+from desktop_agent.parser import parse_command
 from desktop_agent.voice import voice_dependencies_status
 from desktop_agent.voice_listener import WakeWordListener
 from desktop_agent import memory as agent_memory
