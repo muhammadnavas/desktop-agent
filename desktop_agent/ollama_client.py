@@ -155,9 +155,9 @@ def validate_tool_intent(result: object, tools: list[dict]) -> dict:
         path = arguments.get("path")
         if not isinstance(path, str) or not path.strip() or len(path) > 500:
             raise OllamaError("File path must be non-empty relative path text.")
-        from pathlib import PurePath
-        candidate = PurePath(path)
-        if candidate.is_absolute() or candidate.drive or ".." in candidate.parts:
+        from pathlib import PurePath, PureWindowsPath
+        candidates = (PurePath(path), PureWindowsPath(path))
+        if any(candidate.is_absolute() or candidate.drive or ".." in candidate.parts for candidate in candidates):
             raise OllamaError("File tools only accept relative paths inside the configured workspace.")
         if tool_name == "prepare_file_write":
             content = arguments.get("content")
