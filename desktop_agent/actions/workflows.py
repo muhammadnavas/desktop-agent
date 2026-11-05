@@ -104,7 +104,7 @@ def _uninstall_registry_paths() -> list[Path]:
     except ImportError:
         return []
     locations: list[Path] = []
-    uninstall_key = r"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
+    uninstall_key = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
     for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
         for view in (getattr(winreg, "KEY_WOW64_64KEY", 0), getattr(winreg, "KEY_WOW64_32KEY", 0)):
             try:
