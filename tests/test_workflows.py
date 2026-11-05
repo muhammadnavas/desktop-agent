@@ -40,3 +40,14 @@ def test_matches_multiple_filler_phrases_before_command():
 def test_rejects_extra_instruction_after_workflow_phrase():
     assert not is_code_autometa_command("Code Autometa and delete all files")
     assert not is_code_autometa_command("Code Automata then open Notepad")
+
+
+def test_recognizes_noisy_phonetic_transcripts():
+    assert is_code_autometa_command("good potter meta")
+    assert is_code_autometa_command("x 4 automaker")
+    assert is_code_autometa_command("next time good potter meta")
+
+
+def test_ignores_wake_word_without_a_command():
+    assert not is_code_autometa_command("Alexa")
+    assert not is_code_autometa_command("Hey Alexa")
