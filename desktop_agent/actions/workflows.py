@@ -185,6 +185,9 @@ def _find_antigravity_exe() -> Path | None:
     registered = _registered_antigravity_path()
     if registered:
         return registered.resolve()
+    shortcut_target = _find_antigravity_shortcut_exe()
+    if shortcut_target:
+        return shortcut_target.resolve()
     for candidate in _uninstall_registry_paths():
         if candidate.is_file():
             return candidate.resolve()
