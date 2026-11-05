@@ -144,7 +144,8 @@ python -m desktop_agent "Open Notepad"
 - `GET /api/ollama/status` — Ollama and model status
 - `GET /api/diagnostics` — Python platform, Ollama, MongoDB memory connection, optional voice packages, listener state, and desktop dependency diagnostics
 - `POST /api/commands` — JSON: `{"text":"Open Notepad","use_ollama":true}`; supports registered workspace file read and staged-write tools
-- `POST /api/files/confirm-write` — explicitly approve a staged workspace file write using its one-time confirmation token
+- `POST /api/files/confirm-write` — explicitly approve a staged file write using its one-time confirmation token
+- `POST /api/commands/confirm` — approve one exact risk-gated command (for example, closing an application); tokens are single-use and expire after 90 seconds
 - `POST /api/voice/transcribe` — multipart upload with field name `audio`
 - `GET /api/desktop/screenshot` — capture the primary display
 - `POST /api/tasks/plan` — create a screenshot-aware plan without executing it
@@ -199,6 +200,20 @@ will not be clicked. Only UIA controls of type `Button` are supported;
 labels associated with sensitive or destructive actions are blocked.
 This API is Windows-only.
 
+
+
+## Risk-based command execution
+
+Desktop Agent classifies requests before execution:
+
+- **Automatic:** opening an allowlisted app, reading UTF-8 text files, creating folders, and read-only window inspection.
+- **Approval required:** closing an app (to avoid losing unsaved work), editing or overwriting a file (preview first), and desktop UI interaction plans.
+- **Blocked by default:** destructive file deletion/wiping, drive formatting, security weakening, credential disclosure, payments, and purchases. These requests are rejected before Ollama routing.
+- **Unknown tools:** rejected unless explicitly registered and assigned a permission tier.
+
+For an approval-gated command, POST /api/commands returns needs_approval, a description, and a short-lived one-time confirmation_token. Only after the user approves that exact action should the client send the token to POST /api/commands/confirm. The server never executes the pending action just because a model suggested it. All decisions and execution outcomes are logged.
+
+This is a conservative default policy, not a general-purpose shell. Arbitrary PowerShell, CMD, Python scripts, installers, Git commits/pushes, and downloads are not automatically executed.
 
 ## Full filesystem access
 
