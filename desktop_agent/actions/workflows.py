@@ -13,33 +13,23 @@ DEFAULT_PROJECT_ROOT = Path(r"D:\Projects\Python\ai-browser-automation-agent")
 
 
 def is_code_autometa_command(text: str) -> bool:
-    """Recognize the Code Autometa wake command, including common STT variants.
+    """Recognize Code Autometa despite wake words, filler, and STT variants.
 
-    Speech recognition often includes the wake word ("Alexa") and may hear
-    "Autometa" as "Automata". Normalize those harmless variations before
-    matching; never use the transcript as a shell command or filesystem path.
+    Only a transcript ending in the known workflow phrase is accepted.
+    The transcript is never interpolated into a shell command or path.
     """
     normalized = re.sub(r"[^a-z0-9 ]+", " ", str(text).lower())
     normalized = " ".join(normalized.split())
-    normalized = re.sub(r"^(?:hey )?alexa\s+", "", normalized)
-    # Remove harmless conversational lead-ins commonly produced by Whisper.
-    normalized = re.sub(
-        r"^(?:(?:it is|it's|this is|that is|please|can you|could you|start|open|launch|run)\s+)+",
-        "",
-        normalized,
-    )
     normalized = re.sub(r"\b(?:automata|automate|auto meta|auto metta)\b", "autometa", normalized)
 
-    return normalized in {
-        "code autometa",
-        "code autometa project",
-        "start code autometa",
-        "start autometa",
-        "open code autometa",
-        "open autometa",
-        "launch code autometa",
-        "run code autometa",
-    }
+    # Whisper can prepend wake words and conversational fragments such as
+    # "like this, like so". Match the known command at the end, allowing a
+    # short preamble, but do not accept additional instructions after it.
+    return bool(
+        re.search(r"(?:^|\b)code autometa(?: project)?$", normalized)
+        or re.search(r"(?:^|\b)(?:start|open|launch|run) autometa$", normalized)
+        or re.search(r"(?:^|\b)(?:start|open|launch|run) code autometa(?: project)?$", normalized)
+    )
 
 
 def _registered_antigravity_path() -> Path | None:
