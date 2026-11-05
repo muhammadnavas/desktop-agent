@@ -250,6 +250,13 @@ def execute_command(request: CommandRequest):
         tool_arguments = {"path": folder_intent.destination + "/" + folder_intent.folder_name}
         source = "rules"
 
+    if tool_name is None:
+        deterministic_close = parse_close_command(command_text)
+        if deterministic_close is not None:
+            tool_name = "close_app"
+            tool_arguments = {"app_id": deterministic_close.app_id}
+            source = "rules"
+
     interpreted = {}
     if tool_name is None and request.use_ollama:
         try:
