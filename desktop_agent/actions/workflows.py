@@ -199,12 +199,41 @@ def _find_antigravity_exe() -> Path | None:
                     return match.resolve()
     return None
 
+def _find_antigravity_start_app() -> str | None:
+    """Search Windows registered Start Menu apps for Antigravity."""
+    if os.name != "nt":
+        return None
+    script = (
+        "Get-StartApps | Where-Object { $_.Name -match 'Antigravity' } "
+        "| Select-Object -First 1 -ExpandProperty AppID"
+    )
+    try:
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+            capture_output=True, text=True, timeout=8, check=False,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        app_id = result.stdout.strip().splitlines()
+        return app_id[0].strip() if result.returncode == 0 and app_id and app_id[0].strip() else None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
 def _antigravity_launch(root: Path) -> tuple[list[str], str]:
-    """Prefer the Antigravity desktop IDE; fall back to its official agy CLI."""
+    """Search for Antigravity, then open it with the project folder."""
+    # First use a registered executable path from the installer, registry,
+    # PATH, and bounded install-directory search.
     ide = _find_antigravity_exe()
     if ide:
         return [str(ide), str(root)], str(root)
 
+    # Next ask Windows Start Menu for the registered Antigravity application.
+    # This also supports packaged installs that do not expose Antigravity.exe.
+    app_id = _find_antigravity_start_app()
+    if app_id:
+        return ["explorer.exe", f"shell:AppsFolder\\{app_id}"], str(root)
+
+    # Last, search common CLI locations.
     local_app_data = os.environ.get("LOCALAPPDATA")
     cli_candidates = []
     if local_app_data:
@@ -219,8 +248,8 @@ def _antigravity_launch(root: Path) -> tuple[list[str], str]:
         return ["cmd.exe", "/k", f'"{agy}"'], str(root)
 
     raise FileNotFoundError(
-        "Antigravity was not found. Set ANTIGRAVITY_EXE to the full path of Antigravity.exe, "
-        "or install its CLI and add agy to PATH."
+        "Could not find Antigravity. I searched registered Windows apps, common install "
+        "locations, PATH, and the agy CLI. Install Antigravity or set ANTIGRAVITY_EXE."
     )
 
 
