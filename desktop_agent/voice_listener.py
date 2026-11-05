@@ -56,7 +56,6 @@ def should_finish_capture(
     silence_seconds: float,
     max_command_seconds: float,
     speech_start_timeout: float,
-    min_speech_seconds: float,
 ) -> tuple[bool, str]:
     """Pure capture policy, separated from microphone I/O for unit testing."""
     if not speech_seen and elapsed >= speech_start_timeout:
@@ -136,7 +135,6 @@ class WakeWordListener:
 
     def _run(self) -> None:
         try:
-            import numpy as np
             import sounddevice as sd
             import openwakeword
             from openwakeword.model import Model
@@ -222,7 +220,6 @@ class WakeWordListener:
                         silence_seconds=silence_seconds,
                         max_command_seconds=max_command_seconds,
                         speech_start_timeout=speech_start_timeout,
-                        min_speech_seconds=min_speech_seconds,
                     )
                     if not finish:
                         continue
