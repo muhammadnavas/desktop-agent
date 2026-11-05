@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from desktop_agent.actions.apps import launch_app, supported_apps
 from desktop_agent.actions.desktop import capture_screenshot, execute_steps, validate_steps
+from desktop_agent.actions.workflows import is_code_autometa_command, start_code_autometa_workflow
 from desktop_agent.ollama_client import OllamaError, ollama_status, plan_desktop_task, understand_command
 from desktop_agent.parser import LaunchIntent, parse_command
 from desktop_agent.voice import transcribe_audio
@@ -83,6 +84,14 @@ def get_voice_status():
 
 @app.post("/api/commands")
 def execute_command(request: CommandRequest):
+    # Handle this fixed local workflow before Ollama so the wake phrase is deterministic.
+    if is_code_autometa_command(request.text):
+        try:
+            result = start_code_autometa_workflow()
+            return {"success": True, "message": result["message"], "result": result, "source": "workflow"}
+        except (FileNotFoundError, RuntimeError, OSError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     intent = None
     source = "rules"
     response_text = ""
