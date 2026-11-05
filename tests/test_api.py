@@ -136,3 +136,33 @@ def test_code_autometa_starts_fixed_workflow_without_ollama(monkeypatch):
     assert response.json()["success"] is True
     assert response.json()["source"] == "workflow"
     assert response.json()["result"]["workflow"] == "code_autometa"
+
+
+def test_diagnostics_endpoint_reports_optional_dependencies(monkeypatch):
+    monkeypatch.setattr(api, "ollama_status", lambda: {
+        "connected": False,
+        "model_available": False,
+        "error": "offline",
+    })
+
+    response = client.get("/api/diagnostics")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "voice" in payload
+    assert "desktop" in payload
+    assert payload["voice"]["install_command"] in {
+        None, "pip install -e .[voice]"
+    }
+
+
+def test_voice_status_is_actionable_when_listener_has_not_started():
+    monkeypatch_listener = api._wake_listener
+    try:
+        api._wake_listener = None
+        response = client.get("/api/voice/status")
+        assert response.status_code == 200
+        assert response.json()["state"] == "not_started"
+        assert response.json()["available"] is False
+    finally:
+        api._wake_listener = monkeypatch_listener
