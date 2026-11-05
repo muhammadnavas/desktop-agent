@@ -96,7 +96,7 @@ async function refreshStatus(){
  }catch{pill.textContent="Backend offline";engine.textContent="Intent engine: unavailable"}
 }
 function approvalCard({title,description,preview,confirmUrl,cancelUrl,token,onDone}){
- const card=document.createElement("section");card.className="approval-card";
+ const card=document.createElement("section");card.className="approval-card";card.dataset.approvalToken=token;
  const heading=document.createElement("strong");heading.textContent=title;
  const desc=document.createElement("p");desc.textContent=description;
  card.append(heading,desc);
@@ -164,7 +164,11 @@ async function refreshVoiceStatus(){
  if(d.last_voice_activity?.transcript&&d.last_voice_activity.transcript!==lastVoiceTranscript){lastVoiceTranscript=d.last_voice_activity.transcript;addMessage("user","🎙 "+lastVoiceTranscript)}
  if(d.last_response&&d.last_response!==lastVoiceResponse){lastVoiceResponse=d.last_response;addMessage("agent",d.last_response)}
  const pending=d.last_voice_activity?.pending_approval;
- if(pending?.token&&pending.token!==voiceApprovalToken){voiceApprovalToken=pending.token;approvalCard({title:"Voice action needs your approval: "+(pending.tool||"desktop action"),description:pending.message,confirmUrl:"/api/commands/confirm",cancelUrl:"/api/commands/cancel",token:pending.token})}
+ if(pending?.token&&pending.token!==voiceApprovalToken){voiceApprovalToken=pending.token;approvalCard({title:"Voice action needs your approval: "+(pending.tool||"desktop action"),description:pending.message+" You can say “Alexa, yes” to approve or “Alexa, no” to reject.",confirmUrl:"/api/commands/confirm",cancelUrl:"/api/commands/cancel",token:pending.token})}
+ if(!pending?.token&&voiceApprovalToken){
+  approvalArea.querySelectorAll(".approval-card").forEach(card=>{if(card.dataset.approvalToken===voiceApprovalToken)card.remove()});
+  voiceApprovalToken="";
+ }
  }catch{voiceState.querySelector("span:last-child").textContent="Voice listener status unavailable";voiceState.classList.remove("active")}
 }
 document.querySelector("#refresh").addEventListener("click",()=>{refreshStatus();refreshVoiceStatus()});
