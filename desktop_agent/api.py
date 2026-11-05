@@ -227,6 +227,8 @@ def execute_command(request: CommandRequest):
             "launch_app": f"Opening {result.get('app', 'application')}.",
             "get_active_window": f"Active window: {result.get('title') or 'No titled window found.'}",
             "list_open_windows": f"Found {result.get('count', 0)} open windows.",
+            "read_file": f"Read {result.get('path', 'the requested file')}.",
+            "prepare_file_write": f"Prepared {result.get('path', 'the requested file')} for review. Confirm before writing.",
         }
         return {
             "success": True,
@@ -279,6 +281,9 @@ class UIButtonClickRequest(BaseModel):
 class UIActionConfirmRequest(BaseModel):
     confirmation_token: str = Field(min_length=32, max_length=128)
 
+class FileWriteConfirmRequest(BaseModel):
+    confirmation_token: str = Field(min_length=32, max_length=128)
+
 
 class TaskConfirmRequest(BaseModel):
     confirmation_token: str = Field(min_length=32, max_length=128)
@@ -328,6 +333,21 @@ def confirm_ui_button_click(request: UIActionConfirmRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except OSError as exc:
         raise HTTPException(status_code=500, detail=f"Windows could not click the button: {exc}") from exc
+
+
+@app.post("/api/files/confirm-write")
+def confirm_file_write_endpoint(request: FileWriteConfirmRequest):
+    """Commit a staged file write only after explicit user confirmation."""
+    from desktop_agent.actions.files import confirm_file_write
+
+    try:
+        return confirm_file_write(request.confirmation_token)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except TimeoutError as exc:
+        raise HTTPException(status_code=410, detail=str(exc)) from exc
+    except (ValueError, OSError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/api/desktop/screenshot")
