@@ -264,7 +264,7 @@ def _antigravity_launch(root: Path) -> tuple[list[str], str]:
     # PATH, and bounded install-directory search.
     ide = _find_antigravity_exe()
     if ide:
-        return [str(ide), str(root)], str(root)
+        return [str(ide), "--new-window", str(root)], str(root)
 
     # Next ask Windows Start Menu for the registered Antigravity application.
     # This also supports packaged installs that do not expose Antigravity.exe.
@@ -292,8 +292,8 @@ def _antigravity_launch(root: Path) -> tuple[list[str], str]:
     )
 
 
-def _start_servers_in_antigravity(antigravity_pid: int, frontend: Path, backend: Path) -> None:
-    """Create and focus Antigravity integrated terminals before typing server commands."""
+def _start_servers_in_antigravity(antigravity_pid: int, root: Path, frontend: Path, backend: Path) -> None:
+    """Run both servers in terminals belonging to the newly opened project window."""
     try:
         from pywinauto import Desktop
         from pywinauto.keyboard import send_keys
@@ -307,15 +307,16 @@ def _start_servers_in_antigravity(antigravity_pid: int, frontend: Path, backend:
 
     desktop = Desktop(backend="uia")
     window = None
-    deadline = time.monotonic() + 40
+    expected_title = root.name.casefold()
+    deadline = time.monotonic() + 45
     while time.monotonic() < deadline:
         try:
-            # Prefer the main IDE window; do not accidentally target a terminal window.
             candidates = [
                 item for item in desktop.windows(visible_only=True)
                 if "antigravity" in item.window_text().casefold()
+                and expected_title in item.window_text().casefold()
             ]
-            window = next((item for item in candidates if item.is_visible()), None)
+            window = next(iter(candidates), None)
             if window:
                 break
         except Exception:
@@ -323,32 +324,35 @@ def _start_servers_in_antigravity(antigravity_pid: int, frontend: Path, backend:
         time.sleep(0.5)
 
     if window is None:
-        raise RuntimeError("Antigravity opened, but its IDE window was not found.")
+        raise RuntimeError(
+            f"Antigravity did not open a window for project '{root.name}'. "
+            "The servers were not started in another workspace."
+        )
 
     def command_palette(command: str) -> None:
         window.set_focus()
-        time.sleep(0.3)
+        time.sleep(0.4)
         send_keys("^+p")
-        time.sleep(0.5)
-        send_keys(command, with_spaces=True, pause=0.02)
-        time.sleep(0.3)
+        time.sleep(0.6)
+        send_keys(command, with_spaces=True, pause=0.025)
+        time.sleep(0.4)
+        send_keys("{ENTER}")
+        time.sleep(1.2)
+
+    def create_terminal_and_run(command: str) -> None:
+        command_palette("Terminal: Create New Terminal")
+        command_palette("Terminal: Focus on Terminal")
+        # Use cmd.exe explicitly so the command works regardless of whether
+        # Antigravity's selected terminal profile is cmd or PowerShell.
+        send_keys(command, with_spaces=True, pause=0.01)
         send_keys("{ENTER}")
         time.sleep(1.0)
 
-    def create_terminal_and_run(command: str) -> None:
-        # Use the IDE command palette rather than relying on the terminal pane
-        # retaining keyboard focus after a new terminal is created.
-        command_palette("Terminal: Create New Terminal")
-        command_palette("Terminal: Focus on Terminal")
-        send_keys(command, with_spaces=True, pause=0.01)
-        send_keys("{ENTER}")
-        time.sleep(0.7)
-
     create_terminal_and_run(
-        f"Set-Location -LiteralPath '{frontend}'; npm run dev"
+        f'cmd.exe /k "cd /d {frontend} && npm run dev"'
     )
     create_terminal_and_run(
-        f"Set-Location -LiteralPath '{backend}'; uvicorn main:app --reload"
+        f'cmd.exe /k "cd /d {backend} && uvicorn main:app --reload"'
     )
 
 
@@ -378,7 +382,7 @@ def start_code_autometa_workflow() -> dict[str, object]:
         cwd=antigravity_cwd,
         shell=False,
     )
-    _start_servers_in_antigravity(antigravity.pid, frontend, backend)
+    _start_servers_in_antigravity(antigravity.pid, root, frontend, backend)
 
     return {
         "status": "started",
