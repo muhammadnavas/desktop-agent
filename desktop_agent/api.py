@@ -15,7 +15,7 @@ from desktop_agent.actions.registry import available_tools, execute_tool
 from desktop_agent.actions.desktop import capture_screenshot, execute_steps, validate_steps
 from desktop_agent.actions.workflows import is_code_autometa_command, start_code_autometa_workflow
 from desktop_agent.ollama_client import OllamaError, ollama_status, plan_desktop_task, understand_command
-from desktop_agent.parser import parse_command
+from desktop_agent.parser import parse_command, parse_close_command
 from desktop_agent.voice import speak_text, voice_dependencies_status
 from desktop_agent.voice_listener import WakeWordListener
 from desktop_agent import memory as agent_memory
@@ -208,6 +208,26 @@ def execute_command(request: CommandRequest):
             return {"success": True, "message": result["message"], "result": result, "source": "workflow"}
         except (FileNotFoundError, RuntimeError, OSError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    close_intent = parse_close_command(request.text)
+    if close_intent is not None:
+        logger.info("ACTION START | tool=close_app | app_id=%s | source=rules", close_intent.app_id)
+        try:
+            result = execute_tool("close_app", {"app_id": close_intent.app_id})
+            logger.info("ACTION SUCCESS | tool=close_app | result=%s", result)
+            return {
+                "success": True,
+                "message": f"Close requested for {result.get('app', 'application')}.",
+                "result": result,
+                "source": "rules",
+                "tool": "close_app",
+            }
+        except (ValueError, FileNotFoundError, RuntimeError, ProcessLookupError) as exc:
+            logger.exception("ACTION FAILED | tool=close_app")
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except OSError as exc:
+            logger.exception("ACTION FAILED | tool=close_app")
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     source = "rules"
     tool_name = None
