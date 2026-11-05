@@ -22,3 +22,10 @@ def test_matches_common_autometa_speech_variants():
     assert is_code_autometa_command("Alexa, Code Automate")
     assert is_code_autometa_command("Hey Alexa, Code Auto Meta")
     assert is_code_autometa_command("Please launch Code Autometa")
+
+
+
+def test_matches_conversational_voice_transcription():
+    assert is_code_autometa_command("it is a code automata")
+    assert is_code_autometa_command("This is Code Automate")
+    assert is_code_autometa_command("Alexa, please start Code Automata")
