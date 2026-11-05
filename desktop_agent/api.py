@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from desktop_agent.actions.apps import supported_apps
-from desktop_agent.actions.registry import execute_tool
+from desktop_agent.actions.registry import available_tools, execute_tool
 from desktop_agent.actions.desktop import capture_screenshot, execute_steps, validate_steps
 from desktop_agent.actions.workflows import is_code_autometa_command, start_code_autometa_workflow
 from desktop_agent.ollama_client import OllamaError, ollama_status, plan_desktop_task, understand_command
@@ -78,6 +78,12 @@ def health():
 @app.get("/api/apps")
 def get_apps():
     return {"apps": supported_apps()}
+
+
+@app.get("/api/tools")
+def get_tools():
+    """List the explicitly registered actions available to the agent."""
+    return {"tools": available_tools()}
 
 
 @app.get("/api/ollama/status")
