@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -29,6 +30,17 @@ def _connect() -> sqlite3.Connection:
     return connection
 
 
+
+@contextmanager
+def _connection():
+    connection = _connect()
+    try:
+        with connection:
+            yield connection
+    finally:
+        connection.close()
+
+
 def remember(content: str, category: str = "general") -> dict[str, Any]:
     content = content.strip()
     category = category.strip().lower() or "general"
@@ -39,7 +51,7 @@ def remember(content: str, category: str = "general") -> dict[str, Any]:
     if len(category) > 40:
         raise ValueError("Memory category must be 40 characters or fewer.")
     created_at = datetime.now(timezone.utc).isoformat()
-    with _connect() as connection:
+    with _connection() as connection:
         cursor = connection.execute(
             "INSERT INTO memories(content, category, created_at) VALUES (?, ?, ?)",
             (content, category, created_at),
@@ -50,7 +62,7 @@ def remember(content: str, category: str = "general") -> dict[str, Any]:
 
 def list_memories(query: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
     limit = max(1, min(int(limit), 100))
-    with _connect() as connection:
+    with _connection() as connection:
         if query and query.strip():
             rows = connection.execute(
                 "SELECT id, content, category, created_at FROM memories "
@@ -66,7 +78,7 @@ def list_memories(query: str | None = None, limit: int = 50) -> list[dict[str, A
 
 
 def delete_memory(memory_id: int) -> bool:
-    with _connect() as connection:
+    with _connection() as connection:
         cursor = connection.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
         return cursor.rowcount > 0
 
