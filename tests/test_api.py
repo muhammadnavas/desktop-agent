@@ -150,6 +150,7 @@ def test_diagnostics_endpoint_reports_optional_dependencies(monkeypatch):
     assert response.status_code == 200
     payload = response.json()
     assert "voice" in payload
+    assert "memory" in payload
     assert "desktop" in payload
     assert payload["voice"]["install_command"] in {
         None, "pip install -e .[voice]"
