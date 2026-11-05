@@ -184,54 +184,58 @@ def execute_command(request: CommandRequest):
         except (FileNotFoundError, RuntimeError, OSError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    intent = None
     source = "rules"
+    tool_name = None
+    tool_arguments: dict = {}
     response_text = ""
+    normalized = request.text.lower()
 
     if request.use_ollama:
         try:
             interpreted = understand_command(request.text)
             source = "ollama"
-            response_text = interpreted["response"]
-            allowed_app_ids = {item["id"] for item in supported_apps()}
-            if interpreted.get("action") == "launch_app" and interpreted.get("app_id") in allowed_app_ids:
-                intent = LaunchIntent(app_id=interpreted["app_id"])
-            else:
-                # Prefer a deterministic allowlisted match when the model fails
-                # to recognize a supported app (for example, WhatsApp).
-                intent = parse_command(request.text)
-                if intent is None or intent.app_id not in allowed_app_ids:
-                    return {
-                        "success": False,
-                        "message": response_text or "I can't perform that action yet.",
-                        "source": source,
-                    }
+            tool_name = interpreted.get("tool")
+            tool_arguments = interpreted.get("arguments", {})
+            response_text = interpreted.get("response", "")
         except OllamaError:
-            # Local deterministic parser remains available when Ollama is stopped.
             source = "rules_fallback"
 
-    if intent is None:
-        intent = parse_command(request.text)
+    # Deterministic local routing remains available if Ollama is offline or
+    # declines a request that matches one of the explicitly supported tools.
+    if tool_name is None:
+        launch_intent = parse_command(request.text)
+        if launch_intent is not None:
+            tool_name = "launch_app"
+            tool_arguments = {"app_id": launch_intent.app_id}
+        elif any(term in normalized for term in ("active window", "current window", "which app am i using", "what app is open")):
+            tool_name = "get_active_window"
+        elif any(term in normalized for term in ("open windows", "all windows", "which apps are open", "what windows are open")):
+            tool_name = "list_open_windows"
 
-    if intent is None:
+    if tool_name is None:
         raise HTTPException(
             status_code=422,
-            detail="I couldn't identify a supported action. Try asking me to open Notepad, Calculator, File Explorer or VS Code.",
+            detail="I couldn't identify a supported action. Try opening an app or asking which window is active/open.",
         )
 
     try:
-        result = execute_tool("launch_app", {"app_id": intent.app_id})
+        result = execute_tool(tool_name, tool_arguments)
+        default_messages = {
+            "launch_app": f"Opening {result.get('app', 'application')}.",
+            "get_active_window": f"Active window: {result.get('title') or 'No titled window found.'}",
+            "list_open_windows": f"Found {result.get('count', 0)} open windows.",
+        }
         return {
             "success": True,
-            "message": response_text or f"Opening {result['app']}.",
+            "message": response_text or default_messages.get(tool_name, "Action completed."),
             "result": result,
             "source": source,
+            "tool": tool_name,
         }
     except (ValueError, FileNotFoundError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except OSError as exc:
-        raise HTTPException(status_code=500, detail=f"Windows could not launch the app: {exc}") from exc
-
+        raise HTTPException(status_code=500, detail=f"Windows could not complete the action: {exc}") from exc
 
 @app.post("/api/voice/transcribe")
 async def voice_transcribe(audio: UploadFile = File(...)):
