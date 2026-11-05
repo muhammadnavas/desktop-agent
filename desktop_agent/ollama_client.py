@@ -124,10 +124,16 @@ def validate_tool_intent(result: object, tools: list[dict]) -> dict:
     tool_name = result.get("tool")
     arguments = result.get("arguments")
     response = result.get("response", "")
-    if not isinstance(tool_name, str) or not isinstance(arguments, dict):
-        raise OllamaError("Ollama tool intent must include a tool name and object arguments.")
+    if not isinstance(arguments, dict):
+        raise OllamaError("Ollama tool intent arguments must be a JSON object.")
     if not isinstance(response, str):
         raise OllamaError("Ollama tool response must be text.")
+    if tool_name is None:
+        if arguments:
+            raise OllamaError("Unsupported intents must not include tool arguments.")
+        return {"tool": None, "arguments": {}, "response": response[:240]}
+    if not isinstance(tool_name, str):
+        raise OllamaError("Ollama tool name must be text or null.")
 
     definitions = {item["name"]: item for item in tools}
     definition = definitions.get(tool_name)
