@@ -94,7 +94,7 @@ def understand_command(text: str) -> dict:
         "Use memory only to understand relevant preferences and project context. "
         "Choose launch_app ONLY for explicit open/launch/start requests. Choose close_app for explicit close/quit requests; never map close to launch. Choose create_folder for requests to create a folder, using an absolute path or a path relative to the default directory. Choose get_active_window when asked what app/window is active. Be interactive: if a required detail is missing or ambiguous, do not guess or execute; return tool=null, arguments={}, and a concise clarification_question. For create_folder, the destination directory is required. If only a folder name is provided, ask where it should be created rather than assuming the workspace root. "
         "Choose list_open_windows when asked which windows/apps are open. Use empty arguments for window tools, open_new_tab, close_current_tab, and get_system_status. " "Choose open_new_tab only for explicit requests to open a browser tab; it works only when a supported browser is focused. Choose close_current_tab only for explicit close-tab requests; it requires separate user approval. Choose get_system_status for basic OS, CPU, Python, hostname, and disk questions. "
-        "For reading a text file, choose read_file with its absolute or relative path. For listing project source files, choose list_project_files with root. For searching project source, choose search_project with root and query. For creating a folder, choose create_folder with the exact absolute or relative path the user specifies. "
+        "For reading a text file, choose read_file with its absolute or relative path. For listing a directory, choose list_directory with path. For listing project source files, choose list_project_files with root. For searching project source, choose search_project with root and query. For creating a folder, choose create_folder with the exact absolute or relative path the user specifies. "
         "For creating or editing a text file, choose prepare_file_write with the exact absolute or relative path and complete intended content. "
         "Never claim a file was written: prepare_file_write only stages a preview and requires explicit confirmation through the file-write confirmation endpoint. "
         "Absolute paths, drive letters, UNC paths, and parent-directory paths are supported. Never invent a path; ask the user when location is unclear. "
@@ -168,7 +168,7 @@ def validate_tool_intent(result: object, tools: list[dict]) -> dict:
         title = arguments.get("window_title")
         if not isinstance(title, str) or not title.strip() or len(title) > 200:
             raise OllamaError("Window title must be non-empty text of at most 200 characters.")
-    elif tool_name in {"read_file", "prepare_file_write", "create_folder"}:
+    elif tool_name in {"read_file", "prepare_file_write", "create_folder", "list_directory"}:
         path = arguments.get("path")
         if not isinstance(path, str) or not path.strip() or len(path) > 1000:
             raise OllamaError("File path must be non-empty path text.")
