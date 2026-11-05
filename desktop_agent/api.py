@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from desktop_agent.actions.apps import launch_app, supported_apps
 from desktop_agent.ollama_client import OllamaError, ollama_status, understand_command
-from desktop_agent.parser import parse_command
+from desktop_agent.parser import LaunchIntent, parse_command
 from desktop_agent.voice import transcribe_audio
 
 app = FastAPI(
@@ -56,7 +56,7 @@ def execute_command(request: CommandRequest):
             source = "ollama"
             response_text = interpreted["response"]
             if interpreted["action"] == "launch_app":
-                intent = type("Intent", (), {"app_id": interpreted["app_id"]})()
+                intent = LaunchIntent(app_id=interpreted["app_id"])
             else:
                 return {
                     "success": False,
