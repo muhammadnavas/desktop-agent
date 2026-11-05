@@ -10,7 +10,8 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from desktop_agent.actions.apps import launch_app, supported_apps
+from desktop_agent.actions.apps import supported_apps
+from desktop_agent.actions.registry import execute_tool
 from desktop_agent.actions.desktop import capture_screenshot, execute_steps, validate_steps
 from desktop_agent.actions.workflows import is_code_autometa_command, start_code_autometa_workflow
 from desktop_agent.ollama_client import OllamaError, ollama_status, plan_desktop_task, understand_command
@@ -164,7 +165,7 @@ def execute_command(request: CommandRequest):
         )
 
     try:
-        result = launch_app(intent.app_id)
+        result = execute_tool("launch_app", {"app_id": intent.app_id})
         return {
             "success": True,
             "message": response_text or f"Opening {result['app']}.",
