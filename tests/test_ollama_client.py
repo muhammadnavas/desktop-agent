@@ -124,3 +124,13 @@ def test_tool_launch_rejects_non_allowlisted_app():
             {"tool": "launch_app", "arguments": {"app_id": "powershell"}, "response": "Open"},
             TOOLS,
         )
+
+
+def test_unsupported_tool_intent_is_normalized():
+    from desktop_agent.ollama_client import validate_tool_intent
+
+    result = validate_tool_intent(
+        {"tool": None, "arguments": {}, "response": "Not supported"},
+        TOOLS,
+    )
+    assert result == {"tool": None, "arguments": {}, "response": "Not supported"}
