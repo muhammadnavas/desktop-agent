@@ -21,7 +21,7 @@ app = FastAPI(
 )
 INDEX_FILE = Path(__file__).parent / "web" / "index.html"
 _PENDING_TASKS: dict[str, dict] = {}
-_BLOCKED_TASK_TERMS = ("password", "passcode", "one-time code", "otp", "payment", "purchase", "checkout", "delete", "erase", "format drive", "bank account", "credit card", "security settings", "change password")
+_BLOCKED_TASK_TERMS = ("password", "passcode", "one-time code", "otp", "payment", "purchase", "checkout", "send money", "transfer money", "bank transfer", "delete", "erase", "format drive", "bank account", "credit card", "security settings", "change password")
 
 
 class CommandRequest(BaseModel):
