@@ -105,6 +105,19 @@ registry.register(
         handler=_get_active_window,
     )
 )
+def _get_window_controls(window_title: str, limit: int = 60) -> dict[str, Any]:
+    from desktop_agent.actions.windows_uia import get_window_controls
+    return get_window_controls(window_title, limit)
+
+
+registry.register(
+    ToolDefinition(
+        name="get_window_controls",
+        description="Read accessible control names and types in a visible window; does not read field values or perform actions.",
+        handler=_get_window_controls,
+        required_arguments=("window_title",),
+    )
+)
 registry.register(
     ToolDefinition(
         name="list_open_windows",
