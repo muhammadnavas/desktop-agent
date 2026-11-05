@@ -16,14 +16,17 @@ MONGO_URI = os.getenv("DESKTOP_AGENT_MONGO_URI", "mongodb://127.0.0.1:27017")
 MONGO_DATABASE = os.getenv("DESKTOP_AGENT_MONGO_DATABASE", "desktop_agent")
 MONGO_COLLECTION = os.getenv("DESKTOP_AGENT_MONGO_COLLECTION", "memories")
 _SERVER_SELECTION_TIMEOUT_MS = 2000
+_client: MongoClient | None = None
 
 
 def _collection() -> Collection:
     """Connect to the local MongoDB service and return the memories collection."""
+    global _client
     try:
-        client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=_SERVER_SELECTION_TIMEOUT_MS)
-        client.admin.command("ping")
-        collection = client[MONGO_DATABASE][MONGO_COLLECTION]
+        if _client is None:
+            _client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=_SERVER_SELECTION_TIMEOUT_MS)
+        _client.admin.command("ping")
+        collection = _client[MONGO_DATABASE][MONGO_COLLECTION]
         collection.create_index("created_at")
         return collection
     except PyMongoError as exc:
