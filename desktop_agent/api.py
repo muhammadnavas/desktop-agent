@@ -231,25 +231,6 @@ def execute_command(request: CommandRequest):
         except (FileNotFoundError, RuntimeError, OSError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    close_intent = parse_close_command(command_text)
-    if close_intent is not None:
-        logger.info("ACTION START | tool=close_app | app_id=%s | source=rules", close_intent.app_id)
-        try:
-            result = execute_tool("close_app", {"app_id": close_intent.app_id})
-            logger.info("ACTION SUCCESS | tool=close_app | result=%s", result)
-            return {
-                "success": True,
-                "message": f"Close requested for {result.get('app', 'application')}.",
-                "result": result,
-                "source": "rules",
-                "tool": "close_app",
-            }
-        except (ValueError, FileNotFoundError, RuntimeError, ProcessLookupError) as exc:
-            logger.exception("ACTION FAILED | tool=close_app")
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        except OSError as exc:
-            logger.exception("ACTION FAILED | tool=close_app")
-            raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     source = "rules"
     tool_name = None
@@ -283,8 +264,12 @@ def execute_command(request: CommandRequest):
     # Deterministic local routing remains available if Ollama is offline or
     # declines a request that matches one of the explicitly supported tools.
     if tool_name is None:
+        close_intent = parse_close_command(command_text)
         launch_intent = parse_command(command_text)
-        if launch_intent is not None:
+        if close_intent is not None:
+            tool_name = "close_app"
+            tool_arguments = {"app_id": close_intent.app_id}
+        elif launch_intent is not None:
             tool_name = "launch_app"
             tool_arguments = {"app_id": launch_intent.app_id}
         elif any(term in normalized for term in ("active window", "current window", "which app am i using", "what app is open")):
