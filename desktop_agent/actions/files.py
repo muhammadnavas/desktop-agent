@@ -31,6 +31,11 @@ def _resolve_workspace_file(relative_path: str) -> Path:
     candidate = Path(relative_path)
     if candidate.is_absolute() or candidate.drive or any(part == ".." for part in candidate.parts):
         raise ValueError("Only relative paths inside the configured workspace are allowed.")
+    sensitive_names = {".env", ".env.local", ".env.production", "id_rsa", "id_ed25519"}
+    if any(part.casefold() in sensitive_names or "credential" in part.casefold()
+           or "secret" in part.casefold() or part.casefold().endswith((".pem", ".key"))
+           for part in candidate.parts):
+        raise ValueError("Access to secret, credential, and private-key files is blocked.")
     root = workspace_root()
     resolved = (root / candidate).resolve()
     try:
