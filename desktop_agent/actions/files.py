@@ -1,4 +1,4 @@
-"""Workspace-scoped file operations for the local desktop agent."""
+"""Full-filesystem file operations for the local desktop agent."""
 
 from __future__ import annotations
 
@@ -23,30 +23,27 @@ def workspace_root() -> Path:
     return root.resolve()
 
 
-def _resolve_workspace_file(relative_path: str) -> Path:
-    if not isinstance(relative_path, str) or not relative_path.strip():
-        raise ValueError("path must be a non-empty relative path.")
-    if len(relative_path) > 500:
+def resolve_file_path(path: str) -> Path:
+    """Resolve an absolute path anywhere on this PC or a relative path from the default root.
+
+    DESKTOP_AGENT_WORKSPACE remains an optional convenience for relative paths only.
+    Absolute drive paths, UNC paths, and parent-directory traversal are supported.
+    """
+    if not isinstance(path, str) or not path.strip():
+        raise ValueError("path must be non-empty text.")
+    if len(path) > 1000:
         raise ValueError("path is too long.")
-    candidate = Path(relative_path)
-    if candidate.is_absolute() or candidate.drive or any(part == ".." for part in candidate.parts):
-        raise ValueError("Only relative paths inside the configured workspace are allowed.")
-    sensitive_names = {".env", ".env.local", ".env.production", "id_rsa", "id_ed25519"}
-    if any(part.casefold() in sensitive_names or "credential" in part.casefold()
-           or "secret" in part.casefold() or part.casefold().endswith((".pem", ".key"))
-           for part in candidate.parts):
-        raise ValueError("Access to secret, credential, and private-key files is blocked.")
-    root = workspace_root()
-    resolved = (root / candidate).resolve()
-    try:
-        resolved.relative_to(root)
-    except ValueError as exc:
-        raise ValueError("The requested path is outside the configured workspace.") from exc
-    return resolved
+    expanded = Path(path.strip()).expanduser()
+    if not expanded.is_absolute() and not expanded.drive:
+        expanded = workspace_root() / expanded
+    return expanded.resolve()
+
+
+_resolve_workspace_file = resolve_file_path
 
 
 def read_file(path: str) -> dict[str, Any]:
-    """Read a bounded UTF-8 text file inside the configured workspace."""
+    """Read a bounded UTF-8 text file from any accessible local path."""
     target = _resolve_workspace_file(path)
     if not target.exists() or not target.is_file():
         raise FileNotFoundError(f"File not found in workspace: {path}")
@@ -56,7 +53,7 @@ def read_file(path: str) -> dict[str, Any]:
         content = target.read_text(encoding="utf-8")
     except UnicodeDecodeError as exc:
         raise ValueError("Only UTF-8 text files can be read by this tool.") from exc
-    return {"success": True, "path": target.relative_to(workspace_root()).as_posix(),
+    return {"success": True, "path": str(target),
             "content": content, "size_bytes": len(content.encode("utf-8"))}
 
 
@@ -86,7 +83,7 @@ def prepare_file_write(path: str, content: str) -> dict[str, Any]:
         "success": True,
         "requires_confirmation": True,
         "confirmation_token": token,
-        "path": target.relative_to(workspace_root()).as_posix(),
+        "path": str(target),
         "size_bytes": size,
         "overwrites_existing": target.exists(),
         "preview": content[:2000],
@@ -105,9 +102,8 @@ def confirm_file_write(token: str) -> dict[str, Any]:
     if time.monotonic() - pending["created_at"] > _CONFIRMATION_TTL:
         raise TimeoutError("This file-write approval expired. Stage the write again.")
     target: Path = pending["path"]
-    # Re-resolve to detect workspace changes or symlink substitution after staging.
-    relative = target.relative_to(workspace_root())
-    target = _resolve_workspace_file(relative.as_posix())
+    # Resolve again immediately before writing to follow the final on-disk target.
+    target = resolve_file_path(str(target))
     if target.exists() and not target.is_file():
         raise ValueError("The target path is no longer a regular file.")
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -120,20 +116,20 @@ def confirm_file_write(token: str) -> dict[str, Any]:
             temporary.unlink()
     return {
         "success": True,
-        "path": relative.as_posix(),
+        "path": str(target),
         "size_bytes": len(pending["content"].encode("utf-8")),
         "overwrote_existing": pending["overwrites_existing"],
     }
 
 
 def create_folder(path: str) -> dict[str, Any]:
-    """Create a directory inside the configured workspace; never overwrite."""
+    """Create a directory at any accessible local path; never overwrite an existing file."""
     target = _resolve_workspace_file(path)
     if target.exists():
         if target.is_dir():
             return {"success": True, "created": False, "already_exists": True,
-                    "path": target.relative_to(workspace_root()).as_posix()}
+                    "path": str(target)}
         raise FileExistsError(f"A file already exists at this path: {path}")
     target.mkdir(parents=True, exist_ok=False)
     return {"success": True, "created": True, "already_exists": False,
-            "path": target.relative_to(workspace_root()).as_posix()}
+            "path": str(target)}
