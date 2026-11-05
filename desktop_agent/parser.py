@@ -59,7 +59,7 @@ def normalize_spoken_command(text: str) -> str:
 
 
 def parse_create_folder_command(text: str) -> CreateFolderIntent | None:
-    """Extract folder name and optional workspace-relative destination."""
+    """Extract folder name and optional absolute or relative destination."""
     normalized = normalize_spoken_command(text)
     if not re.search(r"\b(create|make)\b", normalized) or not re.search(r"\bfolder\b", normalized):
         return None
@@ -67,6 +67,6 @@ def parse_create_folder_command(text: str) -> CreateFolderIntent | None:
     if not name_match:
         return CreateFolderIntent(None, None)
     folder_name = name_match.group(1).strip(" .")
-    destination_match = re.search(r"\b(?:in|inside|under|within|at)\s+(?:the\s+)?(?:directory|folder)?\s*([a-z0-9][a-z0-9 _-]{0,99})$", normalized)
+    destination_match = re.search(r"\b(?:in|inside|under|within|at)\s+(?:the\s+)?(?:directory|folder)?\s*([a-z0-9][a-z0-9 _:/\\.-]{0,499})$", normalized)
     destination = destination_match.group(1).strip(" .") if destination_match else None
     return CreateFolderIntent(folder_name or None, destination or None)
