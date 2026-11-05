@@ -174,7 +174,7 @@ def test_tools_endpoint_lists_registered_windows_tools():
     assert {
         "launch_app", "get_active_window", "list_open_windows", "get_window_controls",
         "read_file", "prepare_file_write", "close_app", "create_folder",
-        "open_new_tab", "close_current_tab", "get_system_status", "list_project_files", "search_project", "list_directory",
+        "open_new_tab", "close_current_tab", "get_system_status", "run_diagnostic_command", "list_project_files", "search_project", "list_directory",
     } <= {tool["name"] for tool in response.json()["tools"]}
 
 
@@ -603,3 +603,16 @@ def test_list_directory_tool_lists_entries_and_filters_secret_names(tmp_path):
     names = {item["name"] for item in result["entries"]}
     assert {"notes.txt", "docs"} <= names
     assert "secret.txt" not in names
+
+
+def test_diagnostic_command_rejects_non_allowlisted_command(monkeypatch):
+    from desktop_agent.actions.diagnostics import run_diagnostic_command
+    import pytest
+
+    with pytest.raises(ValueError):
+        run_diagnostic_command("powershell")
+
+
+def test_diagnostic_command_tool_is_registered():
+    names = {tool["name"] for tool in client.get("/api/tools").json()["tools"]}
+    assert "run_diagnostic_command" in names
