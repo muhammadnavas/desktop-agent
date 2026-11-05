@@ -7,6 +7,7 @@ A local-first Windows desktop assistant with natural-language commands, local Ol
 - Text commands to launch Notepad, Calculator, File Explorer, or VS Code.
 - Say **“Alexa, code autometa”** to open the AI Browser Automation Agent workspace in Antigravity and start frontend/backend development servers in separate terminal windows.
 - Always-on local Alexa wake-word detection with openWakeWord; after activation, one command is captured and transcribed locally with faster-whisper.
+- Spoken offline feedback after voice commands using Windows SAPI via pyttsx3, including successful actions, unsupported commands, and errors.
 - Local Ollama model interprets natural-language intent. No hosted LLM API key is needed.
 - The model can only choose from a fixed application allowlist; arbitrary shell commands are never executed.
 - Deterministic parser fallback works when Ollama is unavailable.
@@ -61,6 +62,7 @@ Keep Ollama running. Desktop Agent uses these defaults:
 - `OLLAMA_URL=http://127.0.0.1:11434`
 - `OLLAMA_MODEL=qwen2.5:3b`
 - `WHISPER_MODEL=base` (optional local speech-to-text model)
+- `VOICE_RESPONSE_RATE=175` (spoken response speed; supported range 120–220)
 - `OLLAMA_VISION_MODEL=qwen2.5vl:3b` (local screenshot-understanding model)
 
 Override them in PowerShell if needed:
@@ -115,7 +117,8 @@ the normal user-session microphone permissions.
 1. Install the voice extras with `pip install -e ".[voice,desktop]"`.
 2. Start the Desktop Agent API. Its backend listens locally for the **Alexa** wake word.
 3. Say **“Alexa”**, then speak a command. Recording stops after a short silence and faster-whisper transcribes it locally.
-4. Say **“Alexa, code autometa”** to run the fixed development workflow for the AI Browser Automation Agent:
+4. The agent speaks a short response after each command. Detailed results remain available in the dashboard/API; long responses are shortened for speech.
+5. Say **“Alexa, code autometa”** to run the fixed development workflow for the AI Browser Automation Agent:
    - Open the project in Antigravity (or use the `agy` CLI if the IDE launcher is not found).
    - Open a terminal in `frontend` and run `npm run dev`.
    - Open another terminal in `backend` and run `uvicorn main:app --reload`.
