@@ -27,6 +27,32 @@ def supported_apps() -> list[dict[str, str]]:
     return [{"id": app.app_id, "name": app.display_name} for app in _apps().values()]
 
 
+def close_app(app_id: str) -> dict[str, str]:
+    """Request a graceful close for an allowlisted application process."""
+    if os.name != "nt":
+        raise RuntimeError("Desktop Agent currently supports Windows only.")
+    process_images = {
+        "notepad": "Notepad.exe",
+        "calculator": "CalculatorApp.exe",
+        "explorer": "explorer.exe",
+        "vscode": "Code.exe",
+        "whatsapp": "WhatsApp.exe",
+    }
+    image = process_images.get(app_id)
+    if image is None:
+        raise ValueError("That application is not on the approved app list.")
+    completed = subprocess.run(
+        ["taskkill.exe", "/IM", image, "/T"],
+        capture_output=True, text=True, timeout=10, shell=False,
+    )
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout).strip()
+        if "not found" in detail.lower() or "no running instance" in detail.lower():
+            raise ProcessLookupError(f"{app_id} is not currently running.")
+        raise RuntimeError(detail or f"Windows could not close {app_id}.")
+    return {"status": "close_requested", "app": _apps()[app_id].display_name}
+
+
 def launch_app(app_id: str) -> dict[str, str]:
     if os.name != "nt":
         raise RuntimeError("Desktop Agent currently supports Windows only.")
