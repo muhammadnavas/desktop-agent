@@ -149,7 +149,7 @@ python -m desktop_agent "Open Notepad"
 - `GET /api/diagnostics` — Python platform, Ollama, MongoDB memory connection, optional voice packages, listener state, and desktop dependency diagnostics
 - `POST /api/commands` — JSON: `{"text":"Open Notepad","use_ollama":true}`; supports registered workspace file read and staged-write tools
 - `POST /api/files/confirm-write` — explicitly approve a staged file write using its one-time confirmation token
-- `POST /api/commands/confirm` — approve one exact risk-gated command (for example, closing an application); tokens are single-use and expire after 90 seconds
+- `POST /api/commands/confirm` — approve one exact risk-gated command (closing an app/tab or creating a folder); tokens are single-use and expire after 90 seconds
 - `POST /api/voice/transcribe` — multipart upload with field name `audio`
 - `GET /api/desktop/screenshot` — capture the primary display
 - `POST /api/tasks/plan` — create a screenshot-aware plan without executing it
