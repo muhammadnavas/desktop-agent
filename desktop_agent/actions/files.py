@@ -124,3 +124,16 @@ def confirm_file_write(token: str) -> dict[str, Any]:
         "size_bytes": len(pending["content"].encode("utf-8")),
         "overwrote_existing": pending["overwrites_existing"],
     }
+
+
+def create_folder(path: str) -> dict[str, Any]:
+    """Create a directory inside the configured workspace; never overwrite."""
+    target = _resolve_workspace_file(path)
+    if target.exists():
+        if target.is_dir():
+            return {"success": True, "created": False, "already_exists": True,
+                    "path": target.relative_to(workspace_root()).as_posix()}
+        raise FileExistsError(f"A file already exists at this path: {path}")
+    target.mkdir(parents=True, exist_ok=False)
+    return {"success": True, "created": True, "already_exists": False,
+            "path": target.relative_to(workspace_root()).as_posix()}
