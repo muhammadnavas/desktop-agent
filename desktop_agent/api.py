@@ -59,6 +59,7 @@ app = FastAPI(
 )
 INDEX_FILE = Path(__file__).parent / "web" / "index.html"
 _PENDING_TASKS: dict[str, dict] = {}
+_PENDING_UI_ACTIONS: dict[str, dict] = {}
 _BLOCKED_TASK_TERMS = ("password", "passcode", "one-time code", "otp", "payment", "purchase", "checkout", "send money", "transfer money", "bank transfer", "delete", "erase", "format drive", "bank account", "credit card", "security settings", "change password")
 
 
@@ -268,9 +269,63 @@ async def voice_transcribe(audio: UploadFile = File(...)):
 class TaskPlanRequest(BaseModel):
     text: str = Field(min_length=1, max_length=1000)
 
+class UIButtonClickRequest(BaseModel):
+    window_title: str = Field(min_length=1, max_length=200)
+    button_name: str = Field(min_length=1, max_length=120)
+
+
+class UIActionConfirmRequest(BaseModel):
+    confirmation_token: str = Field(min_length=32, max_length=128)
+
 
 class TaskConfirmRequest(BaseModel):
     confirmation_token: str = Field(min_length=32, max_length=128)
+
+
+@app.post("/api/ui-actions/plan-click")
+def plan_ui_button_click(request: UIButtonClickRequest):
+    """Resolve an exact button target and issue a short-lived one-time approval."""
+    try:
+        from desktop_agent.actions.windows_uia import inspect_button_target
+
+        target = inspect_button_target(request.window_title, request.button_name)
+        token = secrets.token_urlsafe(32)
+        _PENDING_UI_ACTIONS[token] = {
+            "window_title": target["window_title"],
+            "button_name": target["button_name"],
+            "created_at": time.monotonic(),
+        }
+        now = time.monotonic()
+        for key in list(_PENDING_UI_ACTIONS):
+            if now - _PENDING_UI_ACTIONS[key]["created_at"] > 90:
+                _PENDING_UI_ACTIONS.pop(key, None)
+        return {
+            "target": target,
+            "confirmation_token": token,
+            "expires_in_seconds": 90,
+            "requires_confirmation": True,
+            "message": f"Ready to click '{target['button_name']}' in '{target['window_title']}'. Approve this exact action to continue.",
+        }
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/ui-actions/confirm-click")
+def confirm_ui_button_click(request: UIActionConfirmRequest):
+    pending = _PENDING_UI_ACTIONS.pop(request.confirmation_token, None)
+    if not pending:
+        raise HTTPException(status_code=404, detail="This approval is invalid, expired, or already used. Create a new approval.")
+    if time.monotonic() - pending["created_at"] > 90:
+        raise HTTPException(status_code=410, detail="This approval expired. Inspect the button again.")
+    try:
+        from desktop_agent.actions.windows_uia import click_button
+
+        result = click_button(pending["window_title"], pending["button_name"])
+        return {"success": True, "result": result}
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Windows could not click the button: {exc}") from exc
 
 
 @app.get("/api/desktop/screenshot")
