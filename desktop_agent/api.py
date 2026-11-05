@@ -1,6 +1,7 @@
 """Local API for the Desktop Agent."""
 
 from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
 import secrets
 import time
@@ -14,8 +15,10 @@ from desktop_agent.actions.desktop import capture_screenshot, execute_steps, val
 from desktop_agent.actions.workflows import is_code_autometa_command, start_code_autometa_workflow
 from desktop_agent.ollama_client import OllamaError, ollama_status, plan_desktop_task, understand_command
 from desktop_agent.parser import LaunchIntent, parse_command
-from desktop_agent.voice import transcribe_audio
+from desktop_agent.voice import voice_dependencies_status
 from desktop_agent.voice_listener import WakeWordListener
+
+logger = logging.getLogger(__name__)
 
 _wake_listener: WakeWordListener | None = None
 
@@ -24,19 +27,25 @@ def _handle_wake_command(transcript: str) -> None:
     try:
         execute_command(CommandRequest(text=transcript, use_ollama=True))
     except Exception:
-        # Listener remains alive even if one command cannot be handled.
-        pass
+        # Keep the listener alive, but never hide the reason a command failed.
+        logger.exception("Could not execute voice command: %s", transcript)
 
 
 @asynccontextmanager
 async def lifespan(_app):
     global _wake_listener
     _wake_listener = WakeWordListener(_handle_wake_command)
-    _wake_listener.start()
+    try:
+        _wake_listener.start()
+    except Exception:
+        # A microphone or optional package failure must not prevent the API/UI
+        # from starting. The voice status endpoint exposes the failure.
+        logger.exception("Could not start wake-word listener")
     try:
         yield
     finally:
-        _wake_listener.stop()
+        if _wake_listener is not None:
+            _wake_listener.stop()
 
 
 app = FastAPI(
@@ -78,8 +87,35 @@ def get_ollama_status():
 @app.get("/api/voice/status")
 def get_voice_status():
     if _wake_listener is None:
-        return {"available": False, "state": "starting", "wake_word": "Alexa"}
+        return {
+            "available": False,
+            "state": "not_started",
+            "wake_word": "Alexa",
+            "last_error": "The application lifespan has not started the listener.",
+        }
     return _wake_listener.status()
+
+
+@app.get("/api/diagnostics")
+def get_diagnostics():
+    """Return actionable local dependency and service diagnostics."""
+    from importlib.util import find_spec
+    import platform
+
+    voice = voice_dependencies_status()
+    voice["listener"] = get_voice_status()
+    desktop_installed = find_spec("pyautogui") is not None
+    ollama = ollama_status()
+    return {
+        "application": {"status": "ok", "python": platform.python_version(), "platform": platform.platform()},
+        "ollama": ollama,
+        "voice": voice,
+        "desktop": {
+            "supported_platform": platform.system() == "Windows",
+            "pyautogui_installed": desktop_installed,
+            "install_command": "pip install -e .[desktop]" if not desktop_installed else None,
+        },
+    }
 
 
 @app.post("/api/commands")
@@ -158,6 +194,8 @@ async def voice_transcribe(audio: UploadFile = File(...)):
             total_bytes += len(chunk)
             if total_bytes > max_bytes:
                 raise HTTPException(status_code=413, detail="Audio file is too large (20 MB limit).")
+
+        from desktop_agent.voice import transcribe_audio
 
         transcript = transcribe_audio(b"".join(chunks), suffix)
         return {"success": True, "text": transcript}
