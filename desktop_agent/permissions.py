@@ -7,14 +7,13 @@ from dataclasses import dataclass
 SAFE_TOOLS = frozenset({
     "launch_app",
     "read_file", "list_project_files", "search_project",
-    "create_folder",
     "get_active_window",
     "list_open_windows",
     "get_window_controls",
     "open_new_tab",
     "get_system_status",
 })
-APPROVAL_TOOLS = frozenset({"close_app", "close_current_tab", "prepare_file_write"})
+APPROVAL_TOOLS = frozenset({"close_app", "close_current_tab", "create_folder", "prepare_file_write"})
 
 # These operations are intentionally unavailable through natural-language routing.
 BLOCKED_COMMAND_PATTERNS = (
