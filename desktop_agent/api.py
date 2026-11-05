@@ -457,6 +457,9 @@ def cancel_command(request: CommandConfirmRequest):
     pending = _PENDING_COMMAND_APPROVALS.pop(request.confirmation_token, None)
     if not pending:
         raise HTTPException(status_code=404, detail="This approval is invalid, expired, or already used.")
+    voice_pending = _last_voice_activity.get("pending_approval") or {}
+    if voice_pending.get("token") == request.confirmation_token:
+        _last_voice_activity["pending_approval"] = None
     return {"success": True, "cancelled": True, "tool": pending["tool"]}
 
 
@@ -467,7 +470,13 @@ def confirm_command(request: CommandConfirmRequest):
     if not pending:
         raise HTTPException(status_code=404, detail="This approval is invalid, expired, or already used. Submit the command again.")
     if time.monotonic() - pending["created_at"] > 90:
+        voice_pending = _last_voice_activity.get("pending_approval") or {}
+        if voice_pending.get("token") == request.confirmation_token:
+            _last_voice_activity["pending_approval"] = None
         raise HTTPException(status_code=410, detail="This approval expired. Submit the command again.")
+    voice_pending = _last_voice_activity.get("pending_approval") or {}
+    if voice_pending.get("token") == request.confirmation_token:
+        _last_voice_activity["pending_approval"] = None
     tool_name = pending["tool"]
     if classify_tool(tool_name).level != "approval":
         raise HTTPException(status_code=403, detail="This action is no longer eligible for approval.")
