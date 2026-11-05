@@ -270,6 +270,7 @@ class WakeWordListener:
         retry_delay = _setting("VOICE_RESTART_DELAY", 5.0, 2.0)
         max_retry_delay = 60.0
         while not self._stop.is_set():
+            worker_started_at = time.monotonic()
             worker = threading.Thread(
                 target=self._run_once,
                 name="desktop-agent-audio-worker",
@@ -280,6 +281,8 @@ class WakeWordListener:
                 worker.join(timeout=0.5)
             if self._stop.is_set():
                 break
+            if time.monotonic() - worker_started_at >= 60:
+                retry_delay = _setting("VOICE_RESTART_DELAY", 5.0, 2.0)
             with self._state_lock:
                 previous_error = self._last_error or "Voice listener stopped unexpectedly."
             logger.warning(
