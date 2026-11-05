@@ -28,3 +28,16 @@ def parse_command(text: str) -> LaunchIntent | None:
         if any(re.search(pattern, normalized) for pattern in patterns):
             return LaunchIntent(app_id)
     return None
+
+
+def parse_close_command(text: str) -> LaunchIntent | None:
+    """Recognize explicit close/quit requests for allowlisted applications."""
+    if not isinstance(text, str) or not text.strip():
+        return None
+    normalized = text.lower().strip()
+    if not re.search(r"\\b(close|quit|exit)\\b", normalized):
+        return None
+    for app_id, patterns in _APP_PATTERNS.items():
+        if any(re.search(pattern, normalized) for pattern in patterns):
+            return LaunchIntent(app_id)
+    return None
