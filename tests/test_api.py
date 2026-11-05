@@ -404,3 +404,40 @@ def test_model_clarification_is_returned_without_running_tool(monkeypatch):
     assert response.status_code == 200
     assert response.json()["needs_clarification"] is True
     assert executed == []
+
+def test_close_phrase_routes_to_close_tool_without_ollama(monkeypatch):
+    executed = []
+    monkeypatch.setattr(api, "understand_command", lambda _text: (_ for _ in ()).throw(AssertionError("Ollama must not override close")))
+    monkeypatch.setattr(api, "execute_tool", lambda name, args: executed.append((name, args)) or {"app": "WhatsApp"})
+    response = client.post("/api/commands", json={"text": "Let's close WhatsApp"})
+    assert response.status_code == 200
+    assert response.json()["tool"] == "close_app"
+    assert executed == [("close_app", {"app_id": "whatsapp"})]
+
+
+def test_incomplete_folder_request_asks_for_name_then_destination(monkeypatch, tmp_path):
+    monkeypatch.setenv("DESKTOP_AGENT_WORKSPACE", str(tmp_path))
+    first = client.post("/api/commands", json={"text": "Alexa can you create a folder", "session_id": "voice-folder"})
+    assert first.status_code == 200
+    assert first.json()["needs_clarification"] is True
+    assert "name" in first.json()["message"].lower()
+
+    second = client.post("/api/commands", json={"text": "Projects", "session_id": "voice-folder"})
+    assert second.status_code == 200
+    assert second.json()["needs_clarification"] is True
+    assert "where" in second.json()["message"].lower()
+
+    third = client.post("/api/commands", json={"text": "Documents", "session_id": "voice-folder"})
+    assert third.status_code == 200
+    assert third.json()["tool"] == "create_folder"
+    assert (tmp_path / "documents" / "projects").is_dir()
+
+
+def test_model_cannot_open_an_app_not_mentioned_by_user(monkeypatch):
+    monkeypatch.setattr(api, "understand_command", lambda _text: {
+        "tool": "launch_app", "arguments": {"app_id": "whatsapp"}, "response": "Opening WhatsApp."
+    })
+    response = client.post("/api/commands", json={"text": "Alexa open mindset", "session_id": "wrong-app"})
+    assert response.status_code == 200
+    assert response.json()["needs_clarification"] is True
+    assert "Which supported app" in response.json()["message"]
