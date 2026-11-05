@@ -17,6 +17,11 @@ def test_vscode():
     assert parse_command("Start VS Code").app_id == "vscode"
 
 
+def test_whatsapp():
+    assert parse_command("Open WhatsApp").app_id == "whatsapp"
+    assert parse_command("Launch Whats App").app_id == "whatsapp"
+
+
 def test_rejects_arbitrary_command():
     assert parse_command("delete all my files") is None
 
