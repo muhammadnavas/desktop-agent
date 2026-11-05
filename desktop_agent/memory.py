@@ -93,3 +93,23 @@ def memory_context(limit: int = 10) -> str:
     return "\n".join(
         f"- [{item['category']}] {item['content']}" for item in reversed(items)
     )
+
+
+def mongo_status() -> dict[str, Any]:
+    """Check the configured MongoDB connection without exposing credentials."""
+    try:
+        _collection()
+        # Do not return the URI because it may contain credentials.
+        return {
+            "connected": True,
+            "database": MONGO_DATABASE,
+            "collection": MONGO_COLLECTION,
+            "host": "local" if MONGO_URI.startswith(("mongodb://127.0.0.1", "mongodb://localhost")) else "configured",
+        }
+    except RuntimeError as exc:
+        return {
+            "connected": False,
+            "database": MONGO_DATABASE,
+            "collection": MONGO_COLLECTION,
+            "error": str(exc),
+        }
