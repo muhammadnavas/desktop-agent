@@ -353,18 +353,25 @@ def execute_command(request: CommandRequest):
         logger.info("ACTION START | tool=%s | arguments=%s | source=%s | permission=%s", tool_name, tool_arguments, source, permission.level)
         result = execute_tool(tool_name, tool_arguments)
         logger.info("ACTION SUCCESS | tool=%s | result=%s", tool_name, result)
+        window_titles = [item.get("title", "") for item in result.get("windows", []) if item.get("title")]
+        file_excerpt = str(result.get("content", "")).strip()
+        if len(file_excerpt) > 280:
+            file_excerpt = file_excerpt[:277].rsplit(" ", 1)[0] + "..."
+        matches = result.get("matches", [])
+        system_disk = result.get("disk", {})
+        free_bytes = system_disk.get("free_bytes")
         default_messages = {
             "launch_app": f"Opening {result.get('app', 'application')}.",
             "close_app": f"Close requested for {result.get('app', 'application')}.",
-            "create_folder": f"Created folder {result.get('path', 'in workspace')}.",
-            "get_active_window": f"Active window: {result.get('title') or 'No titled window found.'}",
-            "list_open_windows": f"Found {result.get('count', 0)} open windows.",
+            "create_folder": f"Created folder {result.get('path', 'in the selected location')}.",
+            "get_active_window": f"Your active window is {result.get('title') or 'untitled'}.",
+            "list_open_windows": f"Found {result.get('count', 0)} open windows" + (": " + ", ".join(window_titles[:5]) if window_titles else "."),
             "open_new_tab": f"Opened a new tab in {result.get('window', 'your browser')}.",
             "close_current_tab": f"Closed the current tab in {result.get('window', 'your browser')}.",
-            "get_system_status": f"System status collected for {result.get('system', 'this computer')}.",
-            "read_file": f"Read {result.get('path', 'the requested file')}.",
-            "list_project_files": f"Found {result.get('count', 0)} project files.",
-            "search_project": f"Found {len(result.get('matches', []))} matches in {result.get('files_inspected', 0)} files.",
+            "get_system_status": f"Your system is {result.get('system', 'running')} {result.get('release', '')}, with {result.get('logical_cpu_count') or 'an unknown number of'} logical CPUs" + (f" and {free_bytes / (1024 ** 3):.1f} GB free on {system_disk.get('root', 'the main drive')}." if isinstance(free_bytes, int) else "."),
+            "read_file": f"Read {result.get('path', 'the requested file')}." + (f" The content starts: {file_excerpt}" if file_excerpt else " The file is empty."),
+            "list_project_files": f"Found {result.get('count', 0)} project files" + (": " + ", ".join(result.get("files", [])[:8]) if result.get("files") else "."),
+            "search_project": f"Found {len(matches)} matches in {result.get('files_inspected', 0)} files" + (": " + "; ".join(f"{m.get('file')} line {m.get('line')}" for m in matches[:5]) if matches else "."),
             "prepare_file_write": (
                 f"Prepared {result.get('path', 'the requested file')} for review. "
                 f"{'This will overwrite the existing file. ' if result.get('overwrites_existing') else ''}"
@@ -373,7 +380,7 @@ def execute_command(request: CommandRequest):
         }
         return {
             "success": True,
-            "message": default_messages[tool_name] if tool_name == "prepare_file_write" else (response_text or default_messages.get(tool_name, "Action completed.")),
+            "message": default_messages.get(tool_name, response_text or "Action completed."),
             "result": result,
             "source": source,
             "tool": tool_name,
