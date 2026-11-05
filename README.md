@@ -7,6 +7,7 @@ A local-first Windows desktop assistant with natural-language commands, local Ol
 - Text and voice commands to launch Notepad, Calculator, File Explorer, VS Code, or WhatsApp.
 - Guarded browser tab controls: open a new tab in a supported focused browser; closing the current tab requires explicit approval.
 - Read-only system status for OS, hostname, Python, CPU count, and disk usage.
+- Fixed read-only diagnostics such as IP configuration, running process list, current user, Windows system information, and Python/Node/Git/Docker version checks. No arbitrary shell or PowerShell execution.
 - File-system browsing and project inspection: list directory contents, enumerate source files, search code, read text files, create folders, and stage file writes for approval.
 - Say **“Alexa, code autometa”** to open the AI Browser Automation Agent workspace in Antigravity and start frontend/backend development servers in separate terminal windows.
 - Always-on local Alexa wake-word detection with openWakeWord; after activation, one command is captured and transcribed locally with faster-whisper.
@@ -139,7 +140,7 @@ python -m desktop_agent "Open Notepad"
 
 - `GET /health` — health check
 - `GET /api/apps` — supported application allowlist
-- `GET /api/tools` — registered agent tools and their required arguments (apps, browser tabs, system status, directory/project files, and window inspection)
+- `GET /api/tools` — registered agent tools and their required arguments (apps, browser tabs, system status, allowlisted diagnostics, directory/project files, and window inspection)
 - `GET /api/skills` and `GET /api/skills/{skill_id}` — discover built-in skills and inspect their instructions
 - `GET /api/memories` — list saved memories; supports `q` and `limit`
 - `POST /api/memories` — explicitly save a memory using JSON `{\"content\":\"...\",\"category\":\"preference\"}`
