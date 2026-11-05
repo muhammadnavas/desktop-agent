@@ -1,74 +1,111 @@
-# NOVA — Local Desktop Agent
+# Desktop Agent
 
-NOVA is a local-first Windows desktop assistant. This first milestone implements a safe, working feature: launch a small allowlist of desktop applications using natural-language text commands.
+A local-first Windows desktop assistant with natural-language commands, local Ollama intent understanding, and optional offline voice transcription.
 
-## v0.1 feature
+## Features
 
-Try:
-- `Open Notepad`
-- `Launch Calculator`
-- `Open File Explorer`
-- `Start VS Code`
-
-NOVA parses the request, maps it to an approved application, and launches it without using a shell.
+- Text commands to launch Notepad, Calculator, File Explorer, or VS Code.
+- Voice input recorded in the browser and transcribed locally with faster-whisper.
+- Local Ollama model interprets natural-language intent. No hosted LLM API key is needed.
+- The model can only choose from a fixed application allowlist; arbitrary shell commands are never executed.
+- Deterministic parser fallback works when Ollama is unavailable.
 
 ## Requirements
 
 - Windows 10/11
 - Python 3.10+
-- Optional: Visual Studio Code installed and its `code` command available on PATH
+- [Ollama](https://ollama.com/download) (recommended)
+- Chrome or Edge for microphone recording
+
+## Install
+
+```powershell
+git clone https://github.com/muhammadnavas/desktop-agent.git
+cd desktop-agent
+py -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+pip install -e .
+```
+
+For offline voice transcription, install the optional dependency:
+
+```powershell
+pip install -e ".[voice]"
+```
+
+## Configure Ollama
+
+Install Ollama, then pull a local model:
+
+```powershell
+ollama pull qwen2.5:3b
+```
+
+Keep Ollama running. Desktop Agent uses these defaults:
+
+- `OLLAMA_URL=http://127.0.0.1:11434`
+- `OLLAMA_MODEL=qwen2.5:3b`
+- `WHISPER_MODEL=base` (optional local speech-to-text model)
+
+Override them in PowerShell if needed:
+
+```powershell
+$env:OLLAMA_MODEL="qwen2.5:3b"
+$env:WHISPER_MODEL="base"
+```
+
+For a laptop with 4 GB VRAM, start with a quantized 3B Ollama model. Ollama may offload layers to system RAM/CPU depending on available memory. Local Whisper runs on CPU with int8 by default.
 
 ## Run
 
 ```powershell
-py -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn nova.api:app --host 127.0.0.1 --port 8765
+uvicorn desktop_agent.api:app --host 127.0.0.1 --port 8765
 ```
 
-Open http://127.0.0.1:8765 in your browser.
+Open http://127.0.0.1:8765.
 
-You can also use the CLI:
+## Voice commands
+
+1. Allow microphone access in Chrome or Edge.
+2. Click **Start voice input**, speak, then click **Stop recording**.
+3. Audio is sent to the local backend and transcribed with faster-whisper.
+4. The transcript is passed to Ollama for intent understanding and execution.
+
+The first Whisper run downloads the selected model. Audio transcription is local; no browser cloud speech recognition is used.
+
+## CLI
 
 ```powershell
-python -m nova "Open Notepad"
+python -m desktop_agent "Open Notepad"
 ```
 
 ## API
 
-- `POST /api/commands` with JSON body `{"text": "Open Calculator"}`
-- `GET /api/apps` lists supported applications.
-- `GET /health` returns service status.
+- `GET /health` — health check
+- `GET /api/apps` — supported application allowlist
+- `GET /api/ollama/status` — Ollama and model status
+- `POST /api/commands` — JSON: `{"text":"Open Notepad","use_ollama":true}`
+- `POST /api/voice/transcribe` — multipart upload with field name `audio`
 
-## Safety model
+## Safety and current scope
 
-- Only explicitly allowlisted applications can be launched.
-- Commands are launched with argument arrays and `shell=False`.
-- NOVA does not execute arbitrary terminal commands.
-- The API binds to localhost by default.
-- This is an early prototype, not a general-purpose autonomous agent yet.
+- The server binds to localhost by default.
+- Only allowlisted apps can be launched.
+- Commands use argument arrays and `shell=False`.
+- This version does not yet click arbitrary UI controls, type into other applications, or execute multi-step workflows. Those require a separate permission and verification layer.
 
-## Project structure
+## Tests
 
-```text
-nova-desktop-agent/
-├── nova/
-│   ├── actions/apps.py
-│   ├── web/index.html
-│   ├── parser.py
-│   ├── api.py
-│   └── __main__.py
-├── tests/
-├── requirements.txt
-└── README.md
+```powershell
+pip install -e ".[dev]"
+pytest -q
 ```
 
 ## Roadmap
 
-1. Safe application launcher (current)
-2. Desktop screenshots and UI inspection
-3. Mouse and keyboard actions with confirmation
-4. Task planning and step-by-step execution
-5. Local LLM integration through Ollama
-6. Memory, audit logs, recovery and voice input
+1. Desktop screenshots and visual inspection
+2. Mouse and keyboard actions with explicit confirmation
+3. Multi-step task planning and execution verification
+4. Session memory, audit logs, retries, and recovery
+5. Wake-word and push-to-talk support
