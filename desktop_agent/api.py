@@ -228,11 +228,15 @@ def execute_command(request: CommandRequest):
             "get_active_window": f"Active window: {result.get('title') or 'No titled window found.'}",
             "list_open_windows": f"Found {result.get('count', 0)} open windows.",
             "read_file": f"Read {result.get('path', 'the requested file')}.",
-            "prepare_file_write": f"Prepared {result.get('path', 'the requested file')} for review. Confirm before writing.",
+            "prepare_file_write": (
+                f"Prepared {result.get('path', 'the requested file')} for review. "
+                f"{'This will overwrite the existing file. ' if result.get('overwrites_existing') else ''}"
+                "Nothing has been written yet. Review the preview and explicitly confirm the one-time token."
+            ),
         }
         return {
             "success": True,
-            "message": response_text or default_messages.get(tool_name, "Action completed."),
+            "message": default_messages[tool_name] if tool_name == "prepare_file_write" else (response_text or default_messages.get(tool_name, "Action completed.")),
             "result": result,
             "source": source,
             "tool": tool_name,
