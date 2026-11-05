@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NOVA — Desktop Agent</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: #090d16; color: #e8edf7; display: grid; place-items: center; padding: 24px; }
+    main { width: min(680px, 100%); border: 1px solid #263247; background: #101827; border-radius: 20px; padding: 28px; box-shadow: 0 24px 80px #0007; }
+    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+    .logo { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; background: #243b64; color: #9fc3ff; font-weight: 800; }
+    h1 { font-size: 22px; margin: 0; } .muted { color: #94a3b8; font-size: 13px; margin-top: 4px; }
+    label { display: block; font-size: 13px; color: #b8c4d8; margin-bottom: 9px; }
+    .entry { display: flex; gap: 10px; }
+    input { flex: 1; min-width: 0; padding: 15px 14px; border: 1px solid #34445e; border-radius: 11px; background: #0b1220; color: white; font-size: 15px; outline: none; }
+    input:focus { border-color: #6b9eea; }
+    button { border: 0; border-radius: 11px; padding: 0 20px; color: #07111f; background: #9fc3ff; font-weight: 700; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: wait; }
+    .examples { display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0 22px; }
+    .chip { padding: 8px 11px; border: 1px solid #34445e; border-radius: 999px; color: #c3d1e7; background: transparent; font-size: 12px; cursor: pointer; }
+    .status { border: 1px solid #263247; border-radius: 12px; padding: 14px; color: #b7c5d9; font-size: 13px; min-height: 48px; }
+    .status.ok { border-color: #27634d; color: #9de0bf; } .status.error { border-color: #75414a; color: #ffb4bd; }
+    .foot { margin-top: 20px; color: #718096; font-size: 12px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="brand">
+    <div class="logo">N</div>
+    <div><h1>NOVA Desktop Agent</h1><div class="muted">Local-first computer assistant · v0.1</div></div>
+  </div>
+  <form id="command-form">
+    <label for="command">What should I open?</label>
+    <div class="entry">
+      <input id="command" maxlength="300" autocomplete="off" placeholder="e.g. Open Notepad" required>
+      <button id="submit" type="submit">Run</button>
+    </div>
+  </form>
+  <div class="examples">
+    <button class="chip" type="button" data-command="Open Notepad">Notepad</button>
+    <button class="chip" type="button" data-command="Launch Calculator">Calculator</button>
+    <button class="chip" type="button" data-command="Open File Explorer">File Explorer</button>
+    <button class="chip" type="button" data-command="Start VS Code">VS Code</button>
+  </div>
+  <div id="status" class="status" role="status" aria-live="polite">Ready. Choose an example or type a command.</div>
+  <div class="foot">Safety: NOVA v0.1 can only launch the applications shown above. It does not execute arbitrary terminal commands. This interface is served from your own computer.</div>
+</main>
+<script>
+  const form = document.querySelector("#command-form");
+  const input = document.querySelector("#command");
+  const statusBox = document.querySelector("#status");
+  const submit = document.querySelector("#submit");
+
+  async function runCommand(text) {
+    statusBox.className = "status";
+    statusBox.textContent = "Understanding your request…";
+    submit.disabled = true;
+    try {
+      const response = await fetch("/api/commands", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || "The command failed.");
+      statusBox.className = "status ok";
+      statusBox.textContent = data.message;
+    } catch (error) {
+      statusBox.className = "status error";
+      statusBox.textContent = error.message || "Unable to reach NOVA.";
+    } finally {
+      submit.disabled = false;
+    }
+  }
+
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+    if (input.value.trim()) runCommand(input.value.trim());
+  });
+
+  document.querySelectorAll("[data-command]").forEach(button => {
+    button.addEventListener("click", () => {
+      input.value = button.dataset.command;
+      runCommand(input.value);
+    });
+  });
+</script>
+</body>
+</html>
