@@ -2,7 +2,7 @@ from desktop_agent.permissions import classify_command_text, classify_tool
 
 
 def test_low_risk_tools_are_automatic():
-    for name in ("launch_app", "read_file", "get_active_window", "list_open_windows", "open_new_tab", "get_system_status"):
+    for name in ("launch_app", "read_file", "list_directory", "list_project_files", "search_project", "get_active_window", "list_open_windows", "open_new_tab", "get_system_status"):
         assert classify_tool(name).level == "safe"
 
 
