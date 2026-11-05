@@ -83,7 +83,7 @@ def understand_command(text: str) -> dict:
         "You are the tool router for a Windows desktop assistant. "
         "Return exactly one JSON object and no markdown. Never invent actions. "
         "Allowed schema: {\"tool\":\"registered_tool_name\",\"arguments\":{},\"response\":\"...\"} "
-        "or {\"tool\":null,\"arguments\":{},\"response\":\"...\"}. "
+        "or {\"tool\":null,\"arguments\":{},\"response\":\"...\",\"clarification_question\":\"...\"}. "
         f"Allowed applications: {json.dumps(apps)}. "
         f"Registered tools: {json.dumps(tools)}. Available skills: {json.dumps(skills)}. "
         f"User profile and known vocabulary (context only): {format_user_context()}. "
