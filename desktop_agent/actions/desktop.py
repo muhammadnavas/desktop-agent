@@ -60,6 +60,9 @@ def validate_steps(steps: Any) -> list[dict[str, Any]]:
             value = step.get("text")
             if not isinstance(value, str) or not value or len(value) > 2000:
                 raise ValueError(f"Step {index + 1} has invalid text.")
+            sensitive_terms = ("password", "passcode", "one-time code", "otp", "credit card", "bank account", "secret key")
+            if any(term in value.lower() for term in sensitive_terms):
+                raise ValueError(f"Step {index + 1} appears to contain sensitive information and is blocked.")
             validated.append({"action": "type", "text": value})
         elif action == "press":
             keys = step.get("keys")
