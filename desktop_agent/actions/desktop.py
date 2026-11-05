@@ -13,8 +13,10 @@ _ALLOWED_KEYS = {
     "ctrl", "shift", "alt", "win", "a", "c", "v", "x", "z", "y",
 }
 _BLOCKED_COMBINATIONS = {
-    ("alt", "f4"), ("ctrl", "alt", "delete"), ("win", "r"),
-    ("win", "x"), ("ctrl", "shift", "esc"),
+    frozenset(("ctrl", "alt", "delete")),
+    frozenset(("ctrl", "shift", "esc")),
+    frozenset(("win", "r")),
+    frozenset(("win", "x")),
 }
 
 
@@ -64,7 +66,7 @@ def validate_steps(steps: Any) -> list[dict[str, Any]]:
             if not isinstance(keys, list) or not 1 <= len(keys) <= 3:
                 raise ValueError(f"Step {index + 1} has invalid keys.")
             normalized = tuple(str(key).lower() for key in keys)
-            if any(key not in _ALLOWED_KEYS for key in normalized) or normalized in _BLOCKED_COMBINATIONS:
+            if any(key not in _ALLOWED_KEYS for key in normalized) or frozenset(normalized) in _BLOCKED_COMBINATIONS:
                 raise ValueError(f"Step {index + 1} contains a blocked or unsupported key combination.")
             validated.append({"action": "press", "keys": list(normalized)})
         elif action == "scroll":
