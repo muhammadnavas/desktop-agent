@@ -70,6 +70,8 @@ TOOLS = [
     {"name": "get_active_window", "required_arguments": []},
     {"name": "list_open_windows", "required_arguments": []},
     {"name": "get_window_controls", "required_arguments": ["window_title"]},
+    {"name": "read_file", "required_arguments": ["path"]},
+    {"name": "prepare_file_write", "required_arguments": ["path", "content"]},
 ]
 
 
@@ -153,5 +155,33 @@ def test_window_controls_tool_rejects_invalid_title():
     with pytest.raises(OllamaError, match="Window title"):
         validate_tool_intent(
             {"tool": "get_window_controls", "arguments": {"window_title": " "}, "response": "Inspecting"},
+            TOOLS,
+        )
+
+
+def test_file_tools_accept_safe_relative_paths():
+    from desktop_agent.ollama_client import validate_tool_intent
+    result = validate_tool_intent(
+        {"tool": "read_file", "arguments": {"path": "docs/README.md"}, "response": "Reading"},
+        TOOLS,
+    )
+    assert result["tool"] == "read_file"
+
+
+@pytest.mark.parametrize("path", ["../secret.txt", "C:\\\\Windows\\\\win.ini", "/etc/passwd"])
+def test_file_tools_reject_absolute_and_traversal_paths(path):
+    from desktop_agent.ollama_client import validate_tool_intent
+    with pytest.raises(OllamaError, match="relative paths"):
+        validate_tool_intent(
+            {"tool": "read_file", "arguments": {"path": path}, "response": "Reading"},
+            TOOLS,
+        )
+
+
+def test_file_write_tool_rejects_large_content():
+    from desktop_agent.ollama_client import validate_tool_intent
+    with pytest.raises(OllamaError, match="1 MB"):
+        validate_tool_intent(
+            {"tool": "prepare_file_write", "arguments": {"path": "notes.txt", "content": "x" * 1_000_001}, "response": "Writing"},
             TOOLS,
         )
