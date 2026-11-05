@@ -344,3 +344,28 @@ def test_natural_language_file_write_only_stages_change(monkeypatch, tmp_path):
     assert payload["tool"] == "prepare_file_write"
     assert "Nothing has been written yet" in payload["message"]
     assert not (tmp_path / "notes.txt").exists()
+
+
+def test_close_app_and_create_folder_tools_are_registered():
+    response = client.get("/api/tools")
+    names = {tool["name"] for tool in response.json()["tools"]}
+    assert {"close_app", "create_folder"} <= names
+
+
+def test_create_folder_tool_creates_only_inside_workspace(monkeypatch, tmp_path):
+    from desktop_agent.actions.files import create_folder
+
+    monkeypatch.setenv("DESKTOP_AGENT_WORKSPACE", str(tmp_path))
+    result = create_folder("new-project/docs")
+    assert result["success"] is True
+    assert result["created"] is True
+    assert (tmp_path / "new-project" / "docs").is_dir()
+
+
+def test_create_folder_rejects_parent_traversal(monkeypatch, tmp_path):
+    from desktop_agent.actions.files import create_folder
+
+    monkeypatch.setenv("DESKTOP_AGENT_WORKSPACE", str(tmp_path))
+    import pytest
+    with pytest.raises(ValueError):
+        create_folder("../outside")
