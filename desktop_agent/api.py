@@ -272,7 +272,7 @@ def execute_command(request: CommandRequest):
         folder_path = str(tool_arguments.get("path", "")).strip()
         if folder_path and "/" not in folder_path and "\\" not in folder_path:
             _PENDING_CLARIFICATIONS[request.session_id] = command_text
-            question = f"Where should I create the '{folder_path}' folder? For example, Documents, Desktop, or a project directory."
+            question = f"Which directory inside the configured workspace should contain '{folder_path}'? For example, enter 'projects' or 'work'."
             return {"success": True, "needs_clarification": True, "message": question, "source": source}
 
     if tool_name is None:
