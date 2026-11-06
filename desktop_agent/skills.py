@@ -21,6 +21,12 @@ SKILLS = {
         "instructions": "For read-only awareness, use get_active_window or list_open_windows. To inspect a window's accessible controls, use get_window_controls with its title; it returns names and types only, never field values. For a button click by accessible name, resolve an exact unique visible enabled Button, show the window and button names, then require the one-time confirmation endpoint. Never click ambiguous controls. For other interactions, use a fresh screenshot, create a bounded plan, show every step, and require explicit approval. Never enter passwords, perform payments, delete data, or change security settings.",
         "examples": ["Click the visible Settings button", "Scroll down this page"],
     },
+    "web_navigation": {
+        "name": "Open websites",
+        "description": "Navigate to a website by common name or validated HTTP(S) URL.",
+        "instructions": "Use open_website only when the user explicitly asks to open, visit, or navigate to a site. Resolve common aliases such as Google, YouTube, ChatGPT, GitHub, and Gmail. Pass only an HTTP(S) URL; never use file:, javascript:, data:, or shell commands.",
+        "examples": ["Open YouTube", "Visit github.com", "Go to https://example.com"],
+    },
     "browser_tabs": {
         "name": "Manage browser tabs",
         "description": "Open a tab in the focused supported browser or close the current tab after approval.",
