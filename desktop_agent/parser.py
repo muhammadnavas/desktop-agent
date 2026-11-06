@@ -1,6 +1,7 @@
 """Deterministic fallback intent parser."""
 
 import re
+from urllib.parse import urlsplit
 from dataclasses import dataclass
 
 
@@ -16,6 +17,46 @@ _APP_PATTERNS = {
     "vscode": (r"\bvs\s*code\b", r"\bvisual studio code\b", r"\bcode editor\b"),
     "whatsapp": (r"\bwhats\s*app\b", r"\bwhatsapp\b"),
 }
+
+
+_WEBSITE_ALIASES = {
+    "google": "https://www.google.com",
+    "youtube": "https://www.youtube.com",
+    "chatgpt": "https://chatgpt.com",
+    "github": "https://github.com",
+    "gmail": "https://mail.google.com",
+    "stackoverflow": "https://stackoverflow.com",
+    "stackoverflow.com": "https://stackoverflow.com",
+}
+
+
+def parse_open_website_command(text: str) -> str | None:
+    """Resolve an explicit website-opening request to a validated HTTP(S) URL."""
+    if not isinstance(text, str) or not text.strip():
+        return None
+    normalized = normalize_spoken_command(text)
+    match = re.search(r"\\b(?:open|visit|browse to|go to|navigate to)\\s+(.+?)\\s*$", normalized)
+    if not match:
+        return None
+    target = match.group(1).strip().strip(" .,!?")
+    target = re.sub(r"^(?:the website|website|site)\\s+", "", target)
+    if target in _WEBSITE_ALIASES:
+        return _WEBSITE_ALIASES[target]
+    if target.startswith("www."):
+        target = "https://" + target
+    elif re.match(r"^[a-z0-9.-]+\\.[a-z]{2,}(?::[0-9]{1,5})?(?:/.*)?$", target):
+        target = "https://" + target
+    try:
+        parsed = urlsplit(target)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            return None
+        if parsed.username or parsed.password:
+            return None
+        if any(ch.isspace() for ch in target) or len(target) > 2048:
+            return None
+        return target
+    except ValueError:
+        return None
 
 
 def parse_command(text: str) -> LaunchIntent | None:
