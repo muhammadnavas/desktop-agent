@@ -125,6 +125,11 @@ def _list_open_windows() -> dict[str, Any]:
     return list_open_windows()
 
 
+def _open_website(url: str) -> dict[str, Any]:
+    from desktop_agent.actions.websites import open_website
+    return open_website(url)
+
+
 def _open_new_tab() -> dict[str, Any]:
     from desktop_agent.actions.browser_tabs import open_new_tab
     return open_new_tab()
