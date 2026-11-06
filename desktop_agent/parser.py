@@ -35,7 +35,7 @@ def parse_open_website_command(text: str) -> str | None:
     if not isinstance(text, str) or not text.strip():
         return None
     normalized = normalize_spoken_command(text)
-    match = re.search(r"\\b(?:open|visit|browse to|go to|navigate to)\\s+(.+?)\\s*$", normalized)
+    match = re.search(r"\b(?:open|visit|browse to|go to|navigate to)\\s+(.+?)\\s*$", normalized)
     if not match:
         return None
     target = match.group(1).strip().strip(" .,!?")
