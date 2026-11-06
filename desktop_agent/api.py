@@ -294,7 +294,7 @@ def execute_command(request: CommandRequest):
     if previous:
         prior_folder = parse_create_folder_command(previous)
         if prior_folder is not None and not prior_folder.folder_name:
-            command_text = "create folder called " + request.text.strip()
+            command_text = "create folder " + request.text.strip()
         elif prior_folder is not None and prior_folder.folder_name and not prior_folder.destination:
             command_text = "create folder called " + prior_folder.folder_name + " in " + request.text.strip()
         else:
