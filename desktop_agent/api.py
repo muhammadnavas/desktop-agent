@@ -34,6 +34,7 @@ _last_voice_activity: dict = {"transcript": "", "response": "", "pending_approva
 def _voice_approval_intent(transcript: str) -> str | None:
     """Recognize deliberately short approval phrases; never ask Ollama to interpret them."""
     phrase = re.sub(r"\s+", " ", re.sub(r"[^a-z0-9\s]", " ", normalize_spoken_command(transcript))).strip()
+    phrase = re.sub(r"^(?:alexa|hey alexa)\s+", "", phrase).strip()
     if phrase in {"yes", "yes approve", "approve", "approved", "confirm", "confirm it", "go ahead", "do it", "proceed"}:
         return "approve"
     if phrase in {"no", "no reject", "reject", "deny", "dont", "do not", "cancel", "cancel it", "stop"}:
@@ -335,6 +336,22 @@ def execute_command(request: CommandRequest):
             tool_name = "close_app"
             tool_arguments = {"app_id": deterministic_close.app_id}
             source = "rules"
+
+    # Route fixed read-only diagnostics deterministically before asking the model.
+    if tool_name is None and any(verb in normalized for verb in ("run ", "show ", "check ", "list ")):
+        diagnostic_aliases = {
+            "ipconfig": "ipconfig", "ip configuration": "ipconfig",
+            "tasklist": "tasklist", "running processes": "tasklist",
+            "whoami": "whoami", "systeminfo": "systeminfo", "system info": "systeminfo",
+            "python version": "python_version", "node version": "node_version",
+            "git version": "git_version", "docker version": "docker_version",
+        }
+        for phrase, command_id in diagnostic_aliases.items():
+            if phrase in normalized:
+                tool_name = "run_diagnostic_command"
+                tool_arguments = {"command_id": command_id}
+                source = "rules"
+                break
 
     interpreted = {}
     if tool_name is None and request.use_ollama:
