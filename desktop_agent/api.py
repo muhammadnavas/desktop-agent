@@ -17,7 +17,7 @@ from desktop_agent.actions.registry import available_tools, execute_tool
 from desktop_agent.actions.desktop import capture_screenshot, execute_steps, validate_steps
 from desktop_agent.actions.workflows import is_code_autometa_command, start_code_autometa_workflow
 from desktop_agent.ollama_client import OllamaError, ollama_status, plan_desktop_task, understand_command
-from desktop_agent.parser import parse_command, parse_close_command, parse_create_folder_command, normalize_spoken_command
+from desktop_agent.parser import parse_command, parse_close_command, parse_create_folder_command, parse_open_website_command, normalize_spoken_command
 from desktop_agent.voice import speak_text, voice_dependencies_status
 from desktop_agent.voice_listener import WakeWordListener
 from desktop_agent import memory as agent_memory
@@ -317,8 +317,14 @@ def execute_command(request: CommandRequest):
     tool_arguments: dict = {}
     response_text = ""
     normalized = normalize_spoken_command(command_text)
+    website_url = parse_open_website_command(command_text)
+    if website_url:
+        tool_name = "open_website"
+        tool_arguments = {"url": website_url}
+        source = "rules"
+
     folder_intent = parse_create_folder_command(command_text)
-    if folder_intent is not None:
+    if tool_name is None and folder_intent is not None:
         if not folder_intent.folder_name:
             _PENDING_CLARIFICATIONS[request.session_id] = command_text
             return {"success": True, "needs_clarification": True, "message": "What should I name the folder?", "source": "rules"}
@@ -387,7 +393,7 @@ def execute_command(request: CommandRequest):
         elif launch_intent is not None:
             tool_name = "launch_app"
             tool_arguments = {"app_id": launch_intent.app_id}
-        elif any(term in normalized for term in ("active window", "current window", "which app am i using", "what app is open")):
+        elif parse_open_website_command(command_text):\n            tool_name = "open_website"\n            tool_arguments = {"url": parse_open_website_command(command_text)}\n        elif any(term in normalized for term in ("active window", "current window", "which app am i using", "what app is open")):
             tool_name = "get_active_window"
         elif any(term in normalized for term in ("open windows", "all windows", "which apps are open", "what windows are open")):
             tool_name = "list_open_windows"
