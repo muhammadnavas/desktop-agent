@@ -55,6 +55,9 @@ def normalize_spoken_command(text: str) -> str:
     normalized = re.sub(r"\s+", " ", (text or "").lower()).strip()
     normalized = re.sub(r"\b(k(e|a)n(a|u)\s+)?kred(a|er|it)\b", "create", normalized)
     normalized = re.sub(r"\bcreat(e|ed|ing)\b", "create", normalized)
+    normalized = re.sub(r"\\bname it as\\s+", "called ", normalized)
+    normalized = re.sub(r"\\bcall it\\s+", "called ", normalized)
+    normalized = re.sub(r"\\bname it\\s+", "called ", normalized)
     return normalized
 
 
