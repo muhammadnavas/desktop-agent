@@ -10,7 +10,7 @@ SAFE_TOOLS = frozenset({
     "get_active_window",
     "list_open_windows",
     "get_window_controls",
-    "open_new_tab",
+    "open_new_tab", "open_website",
     "get_system_status",
     "run_diagnostic_command",
 })
