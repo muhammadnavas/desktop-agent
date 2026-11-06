@@ -35,16 +35,16 @@ def parse_open_website_command(text: str) -> str | None:
     if not isinstance(text, str) or not text.strip():
         return None
     normalized = normalize_spoken_command(text)
-    match = re.search(r"\b(?:open|visit|browse to|go to|navigate to)\\s+(.+?)\\s*$", normalized)
+    match = re.search(r"\b(?:open|visit|browse to|go to|navigate to)\s+(.+?)\s*$", normalized)
     if not match:
         return None
     target = match.group(1).strip().strip(" .,!?")
-    target = re.sub(r"^(?:the website|website|site)\\s+", "", target)
+    target = re.sub(r"^(?:the website|website|site)\s+", "", target)
     if target in _WEBSITE_ALIASES:
         return _WEBSITE_ALIASES[target]
     if target.startswith("www."):
         target = "https://" + target
-    elif re.match(r"^[a-z0-9.-]+\\.[a-z]{2,}(?::[0-9]{1,5})?(?:/.*)?$", target):
+    elif re.match(r"^[a-z0-9.-]+\.[a-z]{2,}(?::[0-9]{1,5})?(?:/.*)?$", target):
         target = "https://" + target
     try:
         parsed = urlsplit(target)
@@ -111,6 +111,6 @@ def parse_create_folder_command(text: str) -> CreateFolderIntent | None:
     if not name_match:
         return CreateFolderIntent(None, None)
     folder_name = name_match.group(1).strip(" .")
-    destination_match = re.search(r"\b(?:in|inside|under|within|at)\s+(?:the\s+)?(?:directory|folder)?\s*([a-z0-9][a-z0-9 _:/\\.-]{0,499})$", normalized)
+    destination_match = re.search(r"\b(?:in|inside|under|within|at)\s+(?:the\s+)?(?:directory|folder)?\s*([a-z0-9][a-z0-9 _:/\.-]{0,499})$", normalized)
     destination = destination_match.group(1).strip(" .") if destination_match else None
     return CreateFolderIntent(folder_name or None, destination or None)
