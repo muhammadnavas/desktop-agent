@@ -231,6 +231,14 @@ def execute_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str
 
 registry.register(
     ToolDefinition(
+        name="open_website",
+        description="Open a validated HTTP or HTTPS website URL in the default browser.",
+        handler=_open_website,
+        required_arguments=("url",),
+    )
+)
+registry.register(
+    ToolDefinition(
         name="open_new_tab",
         description="Open a new tab in the currently focused supported browser.",
         handler=_open_new_tab,
